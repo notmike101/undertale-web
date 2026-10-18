@@ -20,14 +20,33 @@ function delay(milliseconds) {
 }
 
 /**
+ * Normalize a supported key name the same way setKey does.
+ *
+ * @param {string} key - Supported keyboard key.
+ * @returns {string} Normalized key name.
+ */
+function normalizeKey(key) {
+    return key.length === 1 ? key.toLowerCase() : key;
+}
+
+/**
  * Install human controls and the browser agent's observation/action interface.
  *
  * @param {object} state - Shared runtime lifecycle state.
  * @param {HTMLCanvasElement} canvas - Game surface.
  * @param {() => Promise<boolean>} persistSaves - Save-flush callback.
+ * @param {(message: string) => void} log - Diagnostics log callback.
  * @returns {object} Runtime attachment hook.
  */
-export function installAgent(state, canvas, persistSaves) {
+export function installAgent(state, canvas, persistSaves, log) {
+    /*
+       The runner drains its fixed 64-entry per-frame input queue once per presented
+       frame. Keep injected transitions well below that limit so no input is ever
+       silently dropped, and prove each queued event was consumed by observing
+       frame progress.
+     */
+    const MAX_PENDING_INJECTIONS = 48;
+    const DRAIN_CONFIRM_MS = 2_000;
     const held = new Set();
     let acting = false;
     let actionEpoch = 0;
@@ -36,6 +55,103 @@ export function installAgent(state, canvas, persistSaves) {
     let latestSnapshot = null;
     let sampledFrame = -1;
     let paused = false;
+    let pendingInjections = 0;
+    let queueFloorFrame = null;
+    let lastPresentedFrame = -1;
+    const inputHealth = { injectedEvents: 0, gatedWaits: 0, stalledActions: 0, rejectedInjections: 0, healedReleases: 0 };
+
+    /**
+     * Record events written into the runner's per-frame input queue.
+     *
+     * @param {number} count - Number of injected events.
+     * @returns {void}
+     */
+    function noteInjections(count) {
+        pendingInjections += count;
+        inputHealth.injectedEvents += count;
+        queueFloorFrame = lastPresentedFrame;
+    }
+
+    /**
+     * Track frame progress and prove the runner consumed queued input.
+     *
+     * A frame counter at least two ahead of the last injection floor means a
+     * full drain ran after those events were queued; the second frame covers
+     * events injected during a mid-frame runtime suspension.
+     *
+     * @param {number} frame - Runner frame counter from a snapshot or presented frame.
+     * @returns {void}
+     */
+    function noteFrame(frame) {
+        if (!Number.isFinite(frame)) {
+            return;
+        }
+
+        if (frame > lastPresentedFrame) {
+            lastPresentedFrame = frame;
+        }
+
+        if (queueFloorFrame !== null && lastPresentedFrame >= queueFloorFrame + 2) {
+            pendingInjections = 0;
+        }
+    }
+
+    /**
+     * Wait until the runner is proven to have drained its input queue.
+     *
+     * @param {number} [timeoutMs] - Maximum time to wait for frame progress.
+     * @returns {Promise<boolean>} True when the drain is confirmed or the runner
+     * is paused (paused loops present no frames; queued events drain on resume).
+     */
+    async function waitForDrain(timeoutMs = DRAIN_CONFIRM_MS) {
+        if (pendingInjections === 0) {
+            return true;
+        }
+
+        return await new Promise((resolve) => {
+            const deadline = Date.now() + timeoutMs;
+            const poller = setInterval(() => {
+                if (pendingInjections === 0 || paused) {
+                    clearInterval(poller);
+                    resolve(true);
+                } else if (Date.now() >= deadline) {
+                    clearInterval(poller);
+                    resolve(false);
+                }
+            }, 10);
+        });
+    }
+
+    /**
+     * Reserve input-queue room for a batch of injected events.
+     *
+     * Waits for a proven drain when the pending budget is exhausted. A drain
+     * never arriving within the timeout is a runner pipeline stall; that case
+     * is logged and reported instead of injecting into a possibly full queue.
+     *
+     * @param {number} count - Events about to be injected.
+     * @returns {Promise<boolean>} Whether the events may be injected.
+     */
+    async function reserveInjections(count) {
+        if (pendingInjections + count <= MAX_PENDING_INJECTIONS) {
+            return true;
+        }
+
+        inputHealth.gatedWaits++;
+
+        if (await waitForDrain()) {
+            return true;
+        }
+
+        inputHealth.stalledActions++;
+        inputHealth.rejectedInjections += count;
+
+        if (log) {
+            log(`Input pipeline stall: no runner frame within ${DRAIN_CONFIRM_MS} ms; ${count} input event(s) were not injected. See undertaleAgent.status().input.`);
+        }
+
+        return false;
+    }
 
     /**
      * Send a supported game key transition through the real runner input queue.
@@ -45,7 +161,7 @@ export function installAgent(state, canvas, persistSaves) {
      * @returns {void}
      */
     function setKey(key, down) {
-        const normalized = key.length === 1 ? key.toLowerCase() : key;
+        const normalized = normalizeKey(key);
         const code = keyCodes[normalized];
 
         if (!code) {
@@ -59,15 +175,19 @@ export function installAgent(state, canvas, persistSaves) {
         if (down && !held.has(normalized)) {
             held.add(normalized);
             state.runtime._onKeyDown(code);
+            noteInjections(1);
         } else if (!down && held.has(normalized)) {
             held.delete(normalized);
             state.runtime._onKeyUp(code);
+            noteInjections(1);
         }
 
         if (down && key.length === 1) {
             state.runtime._onCharacter(key.codePointAt(0));
+            noteInjections(1);
         } else if (down && key === 'Backspace') {
             state.runtime._onCharacter(8);
+            noteInjections(1);
         }
     }
 
@@ -123,6 +243,7 @@ export function installAgent(state, canvas, persistSaves) {
             const snapshot = JSON.parse(state.runtime.UTF8ToString(pointer));
 
             paused = snapshot.paused;
+            noteFrame(snapshot.frame);
             latestSnapshot = { running: true, ...snapshot };
 
             return latestSnapshot;
@@ -165,6 +286,25 @@ export function installAgent(state, canvas, persistSaves) {
                 await setPaused(false);
             }
 
+            const freshKeys = keys.filter((key) => !held.has(normalizeKey(key)));
+            const charKeys = keys.filter((key) => key.length === 1 || key === 'Backspace');
+            const reservation = freshKeys.length * 3 + charKeys.length + held.size;
+
+            if (reservation > 0 && !await reserveInjections(reservation)) {
+                throw new Error('Runner input queue stalled; the action was not injected. Check undertaleAgent.status().input.');
+            }
+
+            /*
+               Heal runner-side latched keys: release every key being pressed first, so a
+               previously dropped key-up cannot leave the runner holding it and swallow
+               this press.
+             */
+            for (const key of freshKeys) {
+                state.runtime._onKeyUp(keyCodes[normalizeKey(key)]);
+                noteInjections(1);
+                inputHealth.healedReleases++;
+            }
+
             for (const key of keys) {
                 setKey(key, true);
             }
@@ -172,6 +312,14 @@ export function installAgent(state, canvas, persistSaves) {
             await delay(milliseconds);
         } finally {
             releaseAll();
+
+            if (!await waitForDrain()) {
+                inputHealth.stalledActions++;
+
+                if (log) {
+                    log('Input action release was not confirmed by a runner frame; queued input may still be pending. See undertaleAgent.status().input.');
+                }
+            }
 
             if (resumePause && epoch === actionEpoch) {
                 await setPaused(true);
@@ -220,7 +368,13 @@ export function installAgent(state, canvas, persistSaves) {
                 return;
             }
 
+            if (!await reserveInjections(1)) {
+                throw new Error('Runner input queue stalled; typing stopped. Check undertaleAgent.status().input.');
+            }
+
             state.runtime._onCharacter(text.codePointAt(index));
+            noteInjections(1);
+
             await delay(80);
 
             return typeNext(index + 1);
@@ -268,6 +422,21 @@ export function installAgent(state, canvas, persistSaves) {
 
         if (!Array.isArray(keys) || keys.length > 16 || keys.some((key) => typeof key !== 'string' || !keyCodes[key.length === 1 ? key.toLowerCase() : key])) {
             throw new Error('keys must be an array of at most 16 supported keys.');
+        }
+
+        const freshKeys = keys.filter((key) => down && !held.has(normalizeKey(key)));
+        const charKeys = down ? keys.filter((key) => key.length === 1 || key === 'Backspace') : [];
+        const releaseKeys = down ? 0 : keys.filter((key) => held.has(normalizeKey(key))).length;
+        const reservation = freshKeys.length * 2 + charKeys.length + releaseKeys;
+
+        if (pendingInjections + reservation > MAX_PENDING_INJECTIONS) {
+            throw new Error(`${pendingInjections} injected events are still waiting for the runner input queue; retry on the next frame. Check undertaleAgent.status().input.`);
+        }
+
+        for (const key of freshKeys) {
+            state.runtime._onKeyUp(keyCodes[normalizeKey(key)]);
+            noteInjections(1);
+            inputHealth.healedReleases++;
         }
 
         for (const key of keys) {
@@ -355,11 +524,11 @@ export function installAgent(state, canvas, persistSaves) {
          */
         screenshot: () => canvas.toDataURL('image/png'),
         /**
-         * Read lifecycle details without requesting a game-state dump.
+         * Read lifecycle and input-health details without requesting a game-state dump.
          *
-         * @returns {object} Current runtime lifecycle and recent logs.
+         * @returns {object} Current runtime lifecycle, recent logs, and input pipeline counters.
          */
-        status: () => ({ running: state.running, loading: state.loading, paused, error: state.error, source: state.source, logs: state.logs.slice(-15) }),
+        status: () => ({ running: state.running, loading: state.loading, paused, error: state.error, source: state.source, logs: state.logs.slice(-15), input: { pendingInjections, ...inputHealth, maxPendingInjections: MAX_PENDING_INJECTIONS } }),
     });
     connectController(globalThis.undertaleAgent, telemetry);
     document.querySelector('#pause').addEventListener('click', async () => {
@@ -419,6 +588,8 @@ export function installAgent(state, canvas, persistSaves) {
              * @returns {void}
              */
             runtime.onAgentFrame = (frame) => {
+                noteFrame(frame.frame);
+
                 if (frame.frame !== sampledFrame && (frame.frame % 3 === 0 || !latestSnapshot || frame.room.index !== latestSnapshot.room.index)) {
                     observe();
                     sampledFrame = frame.frame;

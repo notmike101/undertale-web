@@ -64,17 +64,17 @@ Rendered-text capture runs every presented frame, and compact state sampling run
 
 | Call | Result / behavior |
 | --- | --- |
-| `status()` | Synchronous lifecycle, error, source, pause state and last 15 log messages. |
+| `status()` | Synchronous lifecycle, error, source, pause state, last 15 log messages, and `input` pipeline counters (`pendingInjections`, `injectedEvents`, `gatedWaits`, `stalledActions`, `rejectedInjections`, `healedReleases`, `maxPendingInjections`). |
 | `look()` | Current compact state: context, control hints, player/battle data, rendered text, writer progress, actors, and capture provenance. Start here. |
 | `observe()` | Raw runner snapshot including instances, variables, tiles and globals. It can contain queued or future text that has not been displayed. It is not the visible dialogue feed. |
 | `screenshot()` | PNG data URL of the game canvas. Browser screenshots are also supported and show the surrounding controls. |
 | `pause()` | Pause the actual runner immediately while deciding. |
 | `resume()` | Resume continuous gameplay immediately. |
-| `await act(keys, milliseconds = 100)` | Hold supported keys together for 0–5000 ms, release, and return compact `look()` state. If paused initially, resume for the action and pause again afterwards. |
+| `await act(keys, milliseconds = 100)` | Hold supported keys together for 0–5000 ms, release, and return compact `look()` state. If paused initially, resume for the action and pause again afterwards. Waits until the runner is proven to have consumed the queued key events; throws (injecting nothing) if the runner input pipeline has stalled instead of reporting success for ignored input. |
 | `await type(text)` | Feed up to 256 printable ASCII characters to the real text-input path, spaced across frames; returns compact `look()` state. |
 | `release()` | Release all held gameplay keys. |
 | `await releaseAll({pause: true})` | Cancel current agent input, release all keys, and optionally pause. |
-| `keysDown({keys: ['ArrowRight']})` / `keysUp({keys: ['ArrowRight']})` | Update held keys for a persistent control loop; returns compact state. An unrefreshed hold releases and pauses after two seconds. Resume first if paused. |
+| `keysDown({keys: ['ArrowRight']})` / `keysUp({keys: ['ArrowRight']})` | Update held keys for a persistent control loop; returns compact state. An unrefreshed hold releases and pauses after two seconds. Resume first if paused. Throws synchronously when too many injected events are still waiting for the runner to drain; retry on the next frame. |
 | `controls()` | Current inferred context, underlying conditions, relevant input hints, and selection details. |
 | `dialogueHistory({afterId: 0})` | Retained screen-text pages, with `oldestId`, `latestId`, and `gap`. The current page can grow under its existing ID. |
 | `events(afterSeq = 0)` | Browser journal replay with `sessionId`, `events`, `oldestSeq`, `latestSeq`, and `gap`. This is the browser API; use broker `replay` over WebSocket. |
@@ -155,6 +155,10 @@ Use short actions near exits, menus, hazards and battles. `act([], 200)` lets an
 For continuous held-key control, use one persistent connection, resume the runner, and send `keysDown`/`keysUp` as the selected action changes. Refresh an intended hold before the two-second watchdog expires; otherwise the browser releases the keys and pauses. Release unnecessary keys before changing direction. Pause during long model deliberation. Neither the watchdog nor the transport provides deterministic frame stepping.
 
 Switching to `act()` cancels the realtime watchdog; the bounded action releases held keys when it ends. Switching to `type()` releases held keys and cancels that watchdog before typing. Explicitly releasing all keys also cancels the watchdog, so an old realtime hold cannot pause a later action.
+
+### Input delivery guarantees
+
+The runner buffers injected input in a fixed 64-entry queue that it drains once per presented frame; events beyond that limit are dropped with no signal. The controller therefore caps its own injections at `status().input.maxPendingInjections` (48) outstanding events, waits for a proven queue drain before injecting more, and confirms drain before `act()` returns. Drain confirmation requires presented frames, so it can only complete while the game is running: a stalled runner surfaces as a thrown `act()`/`type()` call, a thrown `keysDown`/`keysUp`, or a page-log warning with counters in `status().input` — never as a silent no-op. `act()` and `keysDown` additionally send a key-up for each key before pressing it, which clears any runner-side key latched by an earlier lost release. Input being queued and drained is not the same as the game acting on it: scenes may still ignore a press by design, so verify results with the returned `look()` state.
 
 Play according to the human's requested route. Do not change game globals, jump rooms, import fabricated saves or invoke unexposed debug keys to claim a legitimate playthrough. A new run begins from the ordinary menus and uses ordinary interactions. When a SAVE point is reached, complete its menu interaction and then call `save()`. The **Export save** button creates a portable backup.
 
