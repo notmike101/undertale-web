@@ -77,6 +77,8 @@ export function installAgent(state, canvas, persistSaves) {
      * @returns {void}
      */
     function releaseAll() {
+        clearTimeout(watchdog);
+
         for (const key of held) {
             setKey(key, false);
         }
@@ -153,6 +155,7 @@ export function installAgent(state, canvas, persistSaves) {
             throw new Error('Action duration must be between 0 and 5000 milliseconds.');
         }
 
+        clearTimeout(watchdog);
         acting = true;
         const resumePause = paused;
         const epoch = actionEpoch;
@@ -197,6 +200,7 @@ export function installAgent(state, canvas, persistSaves) {
             throw new Error('Launch the game and wait for the current action before typing.');
         }
 
+        releaseAll();
         acting = true;
         const resumePause = paused;
         const epoch = actionEpoch;
