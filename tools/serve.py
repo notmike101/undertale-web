@@ -14,7 +14,7 @@ DEFAULT_GAME = Path(r"C:\Games\steam\steamapps\common\Undertale")
 class Handler(SimpleHTTPRequestHandler):
     """Serve the web directory and a strict allowlist of installed game assets."""
 
-    extensions_map = {**SimpleHTTPRequestHandler.extensions_map, ".wasm": "application/wasm", ".js": "text/javascript"}
+    extensions_map = {**SimpleHTTPRequestHandler.extensions_map, ".wasm": "application/wasm", ".js": "text/javascript", ".mjs": "text/javascript"}
 
     def __init__(self, *args, game_dir, controller_info, **kwargs):
         self.game_dir = game_dir
