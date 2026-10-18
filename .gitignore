@@ -1,0 +1,12 @@
+.private/
+node_modules/
+__pycache__/
+*.pyc
+web/game/
+*.log
+*.data
+data.win
+game.unx
+*.ogg
+*.wav
+.DS_Store
