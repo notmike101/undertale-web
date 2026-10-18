@@ -1,6 +1,6 @@
 :root { color-scheme: dark; font-family: ui-monospace, "Cascadia Code", Consolas, monospace; background: #000; color: #eee; }
 * { box-sizing: border-box; }
-body { margin: 0; overflow: hidden; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #000; }
 button, summary { cursor: pointer; font: inherit; }
 button { border: 1px solid #555; border-radius: 3px; background: #181818; color: inherit; padding: 10px 14px; font-size: 12px; }
 button:hover { background: #333; }
@@ -12,9 +12,9 @@ button:disabled { cursor: wait; opacity: .5; }
 input { font: inherit; max-width: 100%; }
 #status { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 5; max-width: calc(100vw - 32px); padding: 8px 12px; background: #111e; color: #e2cb85; font-size: 12px; text-align: center; overflow-wrap: anywhere; }
 #status:empty { display: none; }
-#player, .game-frame { position: fixed; inset: 0; width: 100%; height: 100%; }
-.game-frame { display: grid; place-items: center; background: #000; }
-.game-surface { position: relative; width: min(100vw, calc(100dvh * 4 / 3)); aspect-ratio: 4 / 3; }
+#player, .game-frame { position: fixed; inset: 0; width: 100vw; height: 100dvh; }
+.game-frame { background: #000; }
+.game-surface { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(100vw, calc(100dvh * 4 / 3)); height: min(100dvh, calc(100vw * 3 / 4)); }
 canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; background: #000; outline: none; }
 #controller-status { position: absolute; top: 8px; right: 10px; margin: 0; padding: 3px 5px; border-radius: 2px; background: #0009; color: #bbb; font-size: 10px; line-height: 1.4; pointer-events: none; }
 #game-menu { position: absolute; top: 8px; left: 8px; font-size: 11px; }

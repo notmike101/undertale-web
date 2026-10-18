@@ -57,3 +57,5 @@ Delivered a playable browser build and AI controller. The user explicitly stoppe
 - Removed surrounding page chrome. Game retains its 640×480 resolution and scales to fit the viewport without cropping.
 - Top-left pull-out menu holds pause/resume, fullscreen, export and restart; AI connection status overlays the game at top right.
 - Browser verified at 1280×720 (960×720 game) and 600×900 (600×450 game), including fullscreen overlays. ESLint remains at zero warnings.
+
+- Centering correction: explicit viewport-sized black stage and independently sized, absolutely centered game surface. Browser assertions passed at 600x900, 1280x720 and 900x900; stylesheet URL refreshed to invalidate stale styling.
