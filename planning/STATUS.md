@@ -29,7 +29,7 @@ Delivered a playable browser build and AI controller. The user explicitly stoppe
 
 - Start: `py -3 tools/serve.py`, then `http://127.0.0.1:8766`.
 - Controller instructions: `docs/AI_PLAYING.md`.
-- Human controls, touch controls, fullscreen, pause, IndexedDB save persistence, backup import/export and relaunch implemented.
+- Human keyboard controls, fullscreen, pause, IndexedDB save persistence, backup import/export and relaunch implemented.
 - Active-game browser lock prevents concurrent tabs overwriting each other's saves.
 - Loading cannot overwrite existing saves; relaunch waits for successful final persistence.
 
@@ -51,3 +51,9 @@ Delivered a playable browser build and AI controller. The user explicitly stoppe
 - Live controller checks passed: rendered text and history, immediate pause, bounded actions, sequenced replay, held-key watchdog, controller disconnect pause, and typing cancellation.
 - Focused JavaScript/Python controller checks passed; both required ESLint configs report zero warnings.
 - Protocol and decision-loop guidance are in docs/AI_PLAYING.md; interpretation limits and live evidence are in docs/PLAYABILITY.md.
+
+## Viewport layout
+
+- Removed surrounding page chrome. Game retains its 640×480 resolution and scales to fit the viewport without cropping.
+- Top-left pull-out menu holds pause/resume, fullscreen, export and restart; AI connection status overlays the game at top right.
+- Browser verified at 1280×720 (960×720 game) and 600×900 (600×450 game), including fullscreen overlays. ESLint remains at zero warnings.

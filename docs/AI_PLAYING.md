@@ -1,6 +1,6 @@
 # Play Undertale with an AI agent
 
-The controller is available as `globalThis.undertaleAgent` in the game page. It feeds the same runtime input queue as human keyboard/touch controls. It does not teleport, edit HP, rewrite saves, or simulate an alternate game.
+The controller is available as `globalThis.undertaleAgent` in the game page. It feeds the same runtime input queue as human keyboard controls. It does not teleport, edit HP, rewrite saves, or simulate an alternate game.
 
 ## Start
 
@@ -156,7 +156,7 @@ For continuous held-key control, use one persistent connection, resume the runne
 
 Play according to the human's requested route. Do not change game globals, jump rooms, import fabricated saves or invoke unexposed debug keys to claim a legitimate playthrough. A new run begins from the ordinary menus and uses ordinary interactions. When a SAVE point is reached, complete its menu interaction and then call `save()`. The **Export save** button creates a portable backup.
 
-When the game intentionally closes, `status().running` becomes false and the page offers **Relaunch**. Relaunch preserves the game's persistent files, which Undertale may use across restarts. Do not clear browser storage to bypass the game's consequences.
+When the game intentionally closes, `status().running` becomes false and the page offers **Restart**. Relaunch preserves the game's persistent files, which Undertale may use across restarts. Do not clear browser storage to bypass the game's consequences.
 
 ## Persistent Python decision loop
 

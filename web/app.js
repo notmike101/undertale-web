@@ -74,6 +74,7 @@ function log(message) {
  */
 function fail(error) {
     state.error = String(error);
+    status.hidden = false;
     status.textContent = state.error;
     log(error);
 }
@@ -274,7 +275,7 @@ async function launch(files) {
         document.querySelector('#import-save').disabled = true;
         state.running = true;
         state.loading = false;
-        status.textContent = 'Click the game to play. Your journey stays in this browser.';
+        status.hidden = true;
         canvas.focus();
         saveTimer = setInterval(persistSaves, 2_000);
         const argumentsList = ['/game/data.win', '--save-folder', '/saves', '--dump-frame-json-file', '/state.json', '--disable-log-colours'];
@@ -283,6 +284,7 @@ async function launch(files) {
             state.running = false;
             clearInterval(saveTimer);
             await persistSaves();
+            status.hidden = false;
             status.textContent = 'The game has closed. Relaunch to continue with your saved progress.';
         }).catch((error) => {
             state.running = false;
@@ -425,5 +427,8 @@ document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
         persistSaves();
     }
+});
+canvas.addEventListener('pointerdown', () => {
+    document.querySelector('#game-menu').open = false;
 });
 const agent = installAgent(state, canvas, persistSaves);

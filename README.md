@@ -1,6 +1,6 @@
 # Undertale Web
 
-Play your installed Undertale game in Chrome or Edge, with original game bytecode running in WebAssembly, keyboard/touch controls, browser saves and an AI controller.
+Play your installed Undertale game in Chrome or Edge, with original game bytecode running in WebAssembly, keyboard controls, browser saves and an AI controller.
 
 The browser host uses [Butterscotch](https://github.com/ButterscotchRunner/Butterscotch). This repository includes its pinned runtime, a small character-input patch, complete corresponding runtime source and license. **No Undertale game assets or recovered game code are included.**
 
@@ -21,7 +21,7 @@ py -3 tools/serve.py --game-dir "D:\Games\Undertale" --port 8766
 
 The installation is read-only. Native Steam saves are not touched. Browser progress lives in IndexedDB for this exact address and browser profile. Use the game's normal SAVE points; export a backup with **Export save**. A different port, hostname or browser profile has separate progress.
 
-**Controls:** arrows move, Z/Enter confirm, X/Shift cancel, C opens the menu. Touch controls appear on touch devices. Pause, fullscreen, save export and relaunch are below the canvas. Ordinary typed text and Backspace are forwarded for in-game text entry.
+**Controls:** arrows move, Z/Enter confirm, X/Shift cancel, C opens the menu. The game scales to contain its original 640×480 image in the full viewport. Open the top-left menu for pause/resume, fullscreen, save export and restart. AI controller status overlays the top-right corner. Ordinary typed text and Backspace are forwarded for in-game text entry.
 
 ## AI play
 
