@@ -1,5 +1,9 @@
 # Working agreements
 
+If you are an AI agent looking to play the game, read `docs/AI_PLAYING.md`.
+
+---
+
 - Prioritize real game playability. Do not add tests unless needed to unblock an observed problem; use focused browser checks.
 - Use Reverse Engineer Anything for shipped artifacts, and preserve source identity and limitations.
 - Do not modify the original installation or native save files.
