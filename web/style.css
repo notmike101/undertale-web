@@ -23,7 +23,11 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
 #game-menu > summary:hover, #game-menu[open] > summary { background: #222e; color: #fff; }
 .menu-panel { display: grid; gap: 7px; width: min(260px, calc(100vw - 32px)); max-height: calc(100dvh - 52px); overflow: auto; margin-top: 5px; padding: 12px; border: 1px solid #444; border-radius: 4px; background: #111f; box-shadow: 0 4px 20px #0008; }
 #save-status { color: #aaa; font-size: 10px; line-height: 1.5; }
-.menu-panel details { color: #999; font-size: 10px; line-height: 1.7; }
 a { color: inherit; }
-pre { max-height: 160px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 10px; }
+#diagnostics { position: fixed; bottom: 10px; left: 10px; z-index: 10; max-width: calc(100vw - 20px); border: 1px solid #35483f; border-radius: 5px; background: #101715f2; color: #9ac9b3; font-size: 11px; box-shadow: 0 4px 20px #0006; }
+#diagnostics > summary { padding: 12px 14px; user-select: none; }
+#diagnostics[open] { width: min(800px, calc(100vw - 20px)); }
+.diagnostics-panel { border-top: 1px solid #35483f; }
+#log { height: min(42dvh, 420px); margin: 0; padding: 10px 14px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.6; }
+.diagnostics-links { padding: 8px 14px; border-top: 1px solid #35483f; font-size: 10px; }
 [hidden] { display: none !important; }

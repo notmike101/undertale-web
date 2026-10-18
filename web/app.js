@@ -380,7 +380,7 @@ folderInput.addEventListener('change', () => {
         read: () => file.arrayBuffer(),
     })));
 });
-document.querySelector('#fullscreen').addEventListener('click', () => document.querySelector('.game-frame').requestFullscreen().catch(fail));
+document.querySelector('#fullscreen').addEventListener('click', () => document.documentElement.requestFullscreen().catch(fail));
 document.querySelector('#export-save').addEventListener('click', exportSave);
 document.querySelector('#restart').addEventListener('click', async () => {
     if (await persistSaves()) {

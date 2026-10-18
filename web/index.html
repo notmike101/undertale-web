@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#000000">
     <title>Undertale Web</title>
     <link rel="icon" href="data:,">
-    <link rel="stylesheet" href="style.css?v=viewport-centered">
+    <link rel="stylesheet" href="style.css?v=diagnostics-overlay">
     <script type="module" src="app.js"></script>
 </head>
 <body>
@@ -31,12 +31,18 @@
                             <button id="export-save">Export save</button>
                             <button id="restart">Restart</button>
                             <span id="save-status">Browser saves ready</span>
-                            <details><summary>Diagnostics &amp; source</summary><pre id="log" aria-label="Runtime log"></pre><a href="runtime/LICENSE">AGPL license</a> · <a href="runtime/butterscotch-source.zip">Runtime source</a></details>
                         </div>
                     </details>
                 </div>
             </div>
         </section>
+        <details id="diagnostics">
+            <summary>UNDERTALE / diagnostics</summary>
+            <div class="diagnostics-panel">
+                <pre id="log" aria-label="Runtime log" tabindex="0"></pre>
+                <div class="diagnostics-links"><a href="runtime/LICENSE">AGPL license</a> · <a href="runtime/butterscotch-source.zip">Runtime source</a></div>
+            </div>
+        </details>
     </main>
 </body>
 </html>
