@@ -1,0 +1,48 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -623,7 +623,7 @@
+                 "-sENVIRONMENT=web"
+                 "-sWASMFS=1"
+                 "-sEXPORTED_RUNTIME_METHODS=['HEAP8', 'HEAPU8', 'HEAPF32', 'ccall', 'cwrap', 'specialHTMLTargets', 'UTF8ToString', 'stringToNewUTF8', 'setValue', 'FS']"
+-                "-sEXPORTED_FUNCTIONS=['_malloc', '_free', '_startRunner', '_mountOpfs', '_parseDataWin', '_getGameName', '_getGameDisplayName', '_freeDataWin', '_onKeyDown', '_onKeyUp', '_onMouseDown', '_onMouseUp', '_onMouseMove', '_requestRunnerExit']"
++                "-sEXPORTED_FUNCTIONS=['_malloc', '_free', '_startRunner', '_mountOpfs', '_parseDataWin', '_getGameName', '_getGameDisplayName', '_freeDataWin', '_onKeyDown', '_onKeyUp', '_onCharacter', '_onMouseDown', '_onMouseUp', '_onMouseMove', '_requestRunnerExit']"
+                 "-sMIN_WEBGL_VERSION=2"
+                 "-sMAX_WEBGL_VERSION=2"
+                 "-sFULL_ES3=1"
+--- a/src/backends/web.c
++++ b/src/backends/web.c
+@@ -13,6 +13,7 @@
+ 
+ enum {
+     INPUTTYPE_KEY,
++    INPUTTYPE_CHARACTER,
+     INPUTTYPE_MOUSE_BUTTON
+ } typedef InputType;
+ 
+@@ -164,6 +165,15 @@
+     gInputQueue[entryIndex].down = true;
+ }
+ 
++void onCharacter(unsigned int character) {
++    if (gInputCount == MAX_KEY_QUEUE)
++        return;
++
++    int entryIndex = gInputCount++;
++    gInputQueue[entryIndex].inputType = INPUTTYPE_CHARACTER;
++    gInputQueue[entryIndex].key = (int) character;
++}
++
+ void onMouseUp(int button) {
+     if (gInputCount == MAX_KEY_QUEUE)
+         return;
+@@ -246,6 +256,10 @@
+         InputEntry entry = gInputQueue[inputIndex];
+ 
+         switch (entry.inputType) {
++            case INPUTTYPE_CHARACTER: {
++                RunnerKeyboard_onCharacter(gRunner->keyboard, (unsigned int) entry.key);
++                break;
++            }
+             case INPUTTYPE_KEY: {
+                 if (entry.down) {
+                     RunnerKeyboard_onKeyDown(gRunner->keyboard, entry.key);

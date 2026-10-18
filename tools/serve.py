@@ -33,7 +33,7 @@ class Handler(SimpleHTTPRequestHandler):
             return {}
         return {p.name: p for p in self.game_dir.iterdir()
                 if p.is_file() and not p.is_symlink()
-                and (p.name.lower() == "data.win" or p.suffix.lower() == ".ogg")}
+                and (p.name.lower() in {"data.win", "credits.txt"} or p.suffix.lower() == ".ogg")}
 
     def do_GET(self):
         path = unquote(urlsplit(self.path).path)

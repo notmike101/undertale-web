@@ -8,10 +8,11 @@ const saveStatus = document.querySelector('#save-status');
 const localButton = document.querySelector('#play-local');
 const folderButton = document.querySelector('#import-folder');
 const folderInput = document.querySelector('#folder');
-const state = { runtime: null, running: false, loading: false, error: null, logs: [], source: null };
+const state = { runtime: null, running: false, loading: false, savesReady: false, error: null, logs: [], source: null };
 let database;
-let saving = false;
+let saveQueue = Promise.resolve();
 let saveTimer;
+let releaseGameLock;
 
 /**
  * Open this origin's browser save database.
@@ -87,7 +88,7 @@ function readSaves() {
     const fs = state.runtime.FS;
 
     for (const name of fs.readdir('/saves')) {
-        if (name !== '.' && name !== '..' && fs.isFile(fs.stat(`/saves/${name}`).mode)) {
+        if (name !== '.' && name !== '..' && (fs.stat(`/saves/${name}`).mode & 0o17_0000) === 0o10_0000) {
             files.push({ name, data: fs.readFile(`/saves/${name}`) });
         }
     }
@@ -98,26 +99,49 @@ function readSaves() {
 /**
  * Persist the game-created files without touching native Steam saves.
  *
- * @returns {Promise<void>} Resolves after the IndexedDB commit.
+ * @returns {Promise<boolean>} Whether the latest snapshot was committed.
  */
 async function persistSaves() {
-    if (!state.runtime || saving) {
-        return;
+    if (!state.savesReady) {
+        return true;
     }
 
-    saving = true;
+    saveQueue = saveQueue.catch(() => undefined).then(() => saveTransaction(readSaves()));
 
     try {
-        const files = readSaves();
+        const files = await saveQueue;
 
-        await saveTransaction(files);
         saveStatus.textContent = files.length ? `Saved in this browser · ${files.length} files` : 'Use a SAVE point to save your journey';
+
+        return true;
     } catch (error) {
         saveStatus.textContent = 'Save storage failed — export a backup now';
         log(error);
-    } finally {
-        saving = false;
+
+        return false;
     }
+}
+
+/**
+ * Prevent a second tab from overwriting the active game's browser saves.
+ *
+ * @returns {Promise<void>} Resolves when this tab owns the game lock.
+ */
+function acquireGameLock() {
+    return new Promise((resolve, reject) => {
+        navigator.locks.request('undertale-web-game', { ifAvailable: true }, async (lock) => {
+            if (!lock) {
+                reject(new Error('Undertale is already open in another tab. Close that game before launching here.'));
+
+                return;
+            }
+
+            await new Promise((release) => {
+                releaseGameLock = release;
+                resolve();
+            });
+        }).catch(reject);
+    });
 }
 
 /**
@@ -127,7 +151,7 @@ async function persistSaves() {
  * @returns {boolean} Whether this is a supported game asset name.
  */
 function validAsset(name) {
-    return /^[\w .()-]+$/u.test(name) && (name.toLowerCase() === 'data.win' || name.toLowerCase().endsWith('.ogg'));
+    return /^[\w .()-]+$/u.test(name) && (['data.win', 'credits.txt'].includes(name.toLowerCase()) || name.toLowerCase().endsWith('.ogg'));
 }
 
 /**
@@ -170,8 +194,11 @@ async function launch(files) {
     }
 
     state.loading = true;
+    state.error = null;
+    state.savesReady = false;
     localButton.disabled = true;
     folderButton.disabled = true;
+    document.querySelector('#import-save').disabled = true;
 
     try {
         if (typeof WebAssembly.Suspending !== 'function') {
@@ -182,6 +209,7 @@ async function launch(files) {
             throw new Error('Select the Undertale folder containing data.win and its .ogg music files.');
         }
 
+        await acquireGameLock();
         status.textContent = 'Starting the WebAssembly runtime…';
         const runtime = await createRunner({
             canvas,
@@ -224,7 +252,7 @@ async function launch(files) {
                     throw new Error('data.win is not a GameMaker archive.');
                 }
 
-                runtime.FS.writeFile(`/game/${file.name.toLowerCase() === 'data.win' ? 'data.win' : file.name}`, bytes);
+                runtime.FS.writeFile(`/game/${file.name.toLowerCase()}`, bytes);
                 loaded += 1;
                 status.textContent = `Loading your game · ${loaded} / ${files.length} files`;
             }));
@@ -239,6 +267,7 @@ async function launch(files) {
             runtime.FS.writeFile(`/saves/${file.name}`, file.data);
         }
 
+        state.savesReady = true;
         document.querySelector('#launcher').hidden = true;
         document.querySelector('#player').hidden = false;
         document.querySelector('#import-save').disabled = true;
@@ -262,9 +291,13 @@ async function launch(files) {
         });
     } catch (error) {
         fail(error);
+        releaseGameLock?.();
+        releaseGameLock = undefined;
         state.loading = false;
+        state.savesReady = false;
         localButton.disabled = false;
         folderButton.disabled = false;
+        document.querySelector('#import-save').disabled = false;
     }
 }
 
@@ -313,7 +346,7 @@ async function launchLocal() {
  */
 async function exportSave() {
     try {
-        const files = state.runtime ? readSaves() : await saveTransaction();
+        const files = state.savesReady ? readSaves() : await saveTransaction();
         const payload = { format: 'undertale-web-save-v1', files: files.map((file) => ({ name: file.name, data: Array.from(file.data) })) };
         const url = URL.createObjectURL(new Blob([JSON.stringify(payload)], { type: 'application/json' }));
         const link = document.createElement('a');
@@ -347,8 +380,9 @@ folderInput.addEventListener('change', () => {
 document.querySelector('#fullscreen').addEventListener('click', () => document.querySelector('.game-frame').requestFullscreen().catch(fail));
 document.querySelector('#export-save').addEventListener('click', exportSave);
 document.querySelector('#restart').addEventListener('click', async () => {
-    await persistSaves();
-    location.reload();
+    if (await persistSaves()) {
+        location.reload();
+    }
 });
 document.querySelector('#import-save').addEventListener('change', async (event) => {
     try {
@@ -372,7 +406,15 @@ document.querySelector('#import-save').addEventListener('change', async (event) 
             return { name: entry.name, data: Uint8Array.from(entry.data) };
         });
 
-        await saveTransaction(snapshot);
+        await acquireGameLock();
+
+        try {
+            await saveTransaction(snapshot);
+        } finally {
+            releaseGameLock();
+            releaseGameLock = undefined;
+        }
+
         status.textContent = 'Save restored. Launch the game to continue.';
     } catch (error) {
         fail(error);

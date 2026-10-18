@@ -2,7 +2,7 @@
 
 ## Current work
 
-Initial two-hour implementation window: prioritize a playable full-data browser build, then focused real-runtime validation. No speculative test suite.
+Delivered a playable browser build and AI controller. The user explicitly stopped playthrough work to prioritize delivery; no complete-route run was attempted.
 
 ## Decisions
 
@@ -18,12 +18,24 @@ Initial two-hour implementation window: prioritize a playable full-data browser 
 - Repository initially empty, remote private: `notmike101/undertale-web`.
 - Original executable identified by REA as x86 PE, SHA256 `c8c4191026bf5587a6fad120855b8b82ffb4fa0c3eaf10515be472ad84248e58`.
 - Original `data.win` identified as GameMaker FORM archive, bytecode version 16.
-- Upstream Butterscotch supplies WebAssembly build; integration underway.
+- Original data contains 336 rooms and 6,272 code entries; 212 external music tracks plus credits are imported locally.
+- Original opening, naming, movement, Flowey battle and first Ruins SAVE interaction exercised with real agent inputs.
+- Rebuilt Butterscotch with a narrow character-input hook for typed in-game text. Complete source and patch shipped.
+- Pause held frame268 unchanged across500ms; resume advanced to286. Screenshot and save transaction succeeded.
+- Both requested ESLint configs enabled; authored JavaScript passes with zero warnings.
+- Runtime restoration and optional local Windows build both executed successfully.
 
-## Remaining
+## Delivery
 
-1. Launch real game in browser.
-2. Human keyboard/touch, audio, browser save persistence.
-3. Agent observations/actions and real gameplay evidence.
-4. ESLint zero warnings, reproducible setup, compatibility notes.
-5. Commit and push coherent increments; retain explicit unknowns about full-game completion.
+- Start: `py -3 tools/serve.py`, then `http://127.0.0.1:8766`.
+- Controller instructions: `docs/AI_PLAYING.md`.
+- Human controls, touch controls, fullscreen, pause, IndexedDB save persistence, backup import/export and relaunch implemented.
+- Active-game browser lock prevents concurrent tabs overwriting each other's saves.
+- Loading cannot overwrite existing saves; relaunch waits for successful final persistence.
+
+## Explicitly unverified / omitted
+
+- Full routes/endings, complete fidelity, named-game SAVE/Continue cycle and device/browser matrix.
+- WebGPU backend: uses working WebGL2 backend to prioritize the actual game.
+- No public deployment or game-asset redistribution.
+- No broad test suite, per user instruction. Focused evidence is in `docs/PLAYABILITY.md`.

@@ -122,5 +122,65 @@ audio timing, Steam fallbacks, browser exit/restart handling, and persistence
 after a browser reload. Runtime verification and any observed limitations belong
 in the delivery notes; this static report should not be read as those checks.
 
+## Focused missing-function investigation
+
+The upstream runner's registration table initially omitted ten builtin names
+present in this installed game's `FUNC` table. To distinguish active behavior
+from unused or platform-specific code, UndertaleModTool CLI 0.9.2.0 was obtained
+from its [official release](https://github.com/UnderminersTeam/UndertaleModTool/releases/tag/0.9.2.0).
+The Windows archive SHA-256 is
+`e7573e45d107be34f81f955c6e4afc3c7c8f2628e5a6f307a871e3825b3dfb40`.
+The tool and all recovered code remain under ignored `.private/utmt`; no game
+source or recovered code belongs in the distributable project.
+
+The decompiler emitted 6,272 code-entry files. Focused entry dumps are in
+`.private/utmt/decompiled/CodeEntries`, and the complete private search corpus is
+`.private/utmt/all/CodeEntries`. The code analysis found:
+
+| Missing registration | Static finding | Consequence / remaining limit |
+| --- | --- | --- |
+| `steam_file_delete`, `steam_file_write_file` | Calls are inside `steam_initialised()` or `global.steam_int == 1` guards. Only the successful initialization branch sets that flag to 1. | The runner's false Steam initialization fallback avoids these calls; local filesystem persistence remains necessary. |
+| `buffer_async_group_option` | Only in the `osflavor > 2` console savedata branches. | Desktop filesystem path avoids it. |
+| `get_string_async` | Essay input calls it only when `osflavor > 2`, indicating no keyboard. | Desktop path uses keyboard input. |
+| `texture_set_interpolation` | Only inside `osflavor >= 3` application-surface presentation. | Desktop presentation avoids it. |
+| `extension_stubfunc_real` | Used with an `os_type == os_ps4` condition. | Result is immaterial for desktop; eager boolean evaluation could still execute it. |
+| `sprite_prefetch` | Texture warmup calls; return values unused. | Omitting warmup can affect timing but does not replace texture rendering. |
+| `draw_getpixel` | Only two legacy effect objects, `obj_vaporized_old` (157) and `obj_vaporacquirer` (161). | Neither has room placements, inheriting children, or named references in the complete decompiled corpus. Dynamic numeric creation is not excluded by this bounded search. Active vapor effects use different objects. |
+| `sprite_replace` | 65 unconditional attempts in Flowey initialization, all targeting missing `external/` files. | Embedded Flowey sprites exist; native failure semantics require separate inspection. |
+| `sprite_collision_mask` | One unconditional call after those replacement attempts. | Its requested bounds differ from the embedded sprite; native mutability checks must be preserved before treating this as a required bounds change. |
+
+The only discovered assignments to `global.osflavor` are in `obj_time` creation:
+Windows maps to 1, PS4/Vita to 4, and all other platforms to 2. This conclusion
+comes from searching all recovered code, not just startup strings.
+
+### Flowey native mask guard
+
+Raw PE address mapping ties the `sprite_collision_mask` registration at
+`0x51d078` to native function `0x5185c0`, and `sprite_replace` registrations to
+`0x517e00`. The game requests a manual rectangle for `spr_floweynuke` with left
+13, top 44, right 34, bottom 100. The embedded sprite is 79 by 133 and has left
+22, top 20, right 55, bottom 100. These are observed values; they alone do not
+establish a gameplay mismatch.
+
+REA/Ghidra inspection of the original native runner showed that the mask entry
+looks up the sprite and calls helper `0x494190`. That helper returns before
+changing bounds when the pointer at sprite offset `0x54` is nonzero and the byte
+at `0x36` is zero. Later accesses identify `0x54` as a per-frame texture-entry
+array; interpreting `0x36` as a dynamic/modifiable flag is an inference. This
+guard is consistent with GameMaker's documented restriction that
+[collision-mask mutation applies to added/duplicated sprites](https://manual.gamemaker.io/monthly/en/GameMaker_Language/GML_Reference/Asset_Management/Sprites/Sprite_Manipulation/sprite_collision_mask.htm).
+Blindly overwriting the embedded sprite's bounds would risk changing the game.
+
+| REA operation | Evidence ID | Private report |
+| --- | --- | --- |
+| Native mask entry `0x5185c0` | `ev_b2a353caba39c25ce81141276b4039e448287d93a6d7954d7f8fe01d51b9051e` | `native-sprite-mask.json` |
+| Mask application helper `0x494190` | `ev_d2660788703962b0cb0c0a02041a0b9d2f704103c5f054a7ea04926697aff61e` | `native-sprite-mask-apply.json` |
+| Sprite lookup `0x498130` | `ev_acae84dd21a445a68af1c10c170ebb3b5211badec86e0d9a81ac661837f84d90` | `native-sprite-lookup.json` |
+
+These reports are in `.private/reports`. Pseudocode is decompiler output, not
+original source; precise original field names and live flag values remain
+unobserved. The initial apparent collision discrepancy was therefore narrowed
+to an unresolved mutability question rather than presented as a confirmed bug.
+
 No tests were created or run for this inspection, as requested. The inventory
-command itself was executed against the installed data to produce the report.
+and decompiler commands were executed to produce the static evidence.
