@@ -154,6 +154,8 @@ Use short actions near exits, menus, hazards and battles. `act([], 200)` lets an
 
 For continuous held-key control, use one persistent connection, resume the runner, and send `keysDown`/`keysUp` as the selected action changes. Refresh an intended hold before the two-second watchdog expires; otherwise the browser releases the keys and pauses. Release unnecessary keys before changing direction. Pause during long model deliberation. Neither the watchdog nor the transport provides deterministic frame stepping.
 
+Switching to `act()` cancels the realtime watchdog; the bounded action releases held keys when it ends. Switching to `type()` releases held keys and cancels that watchdog before typing. Explicitly releasing all keys also cancels the watchdog, so an old realtime hold cannot pause a later action.
+
 Play according to the human's requested route. Do not change game globals, jump rooms, import fabricated saves or invoke unexposed debug keys to claim a legitimate playthrough. A new run begins from the ordinary menus and uses ordinary interactions. When a SAVE point is reached, complete its menu interaction and then call `save()`. The **Export save** button creates a portable backup.
 
 When the game intentionally closes, `status().running` becomes false and the page offers **Restart**. Relaunch preserves the game's persistent files, which Undertale may use across restarts. Do not clear browser storage to bypass the game's consequences.
