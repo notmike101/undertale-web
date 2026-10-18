@@ -1,0 +1,123 @@
+name: Issue report
+description: Report an issue with reproduction steps, local troubleshooting, and direct evidence.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Complete every section. Use exact versions and commands; write "Unknown" or "Not applicable" with a reason where needed.
+        Report observed behavior separately from upstream claims and suspected causes.
+        Do NOT propose code changes without explicit human authorization. Filing this issue does not grant that authorization.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Detailed issue description
+      description: Explain the problem, its impact, when it started, and how often it occurs.
+      placeholder: |
+        Summary and affected feature:
+        Expected behavior:
+        Actual behavior:
+        Impact and frequency:
+        First occurrence and last known working revision (if known):
+    validations:
+      required: true
+
+  - type: textarea
+    id: local-attempts
+    attributes:
+      label: Local troubleshooting without code modification
+      description: |
+        List what you already tried locally without modifying code, including exact commands or actions and each result.
+        If nothing was attempted, say so and explain why. Do not modify the original game installation or native saves.
+      placeholder: |
+        1. Action or exact command:
+           Result and supporting evidence:
+        Local settings changed, if any:
+        Current state after troubleshooting:
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Exact environment
+      description: |
+        Include exact versions and relevant configuration, not just "latest". Mark unused tools "Not applicable".
+        Redact usernames, private paths, and credentials while preserving details needed to reproduce.
+      placeholder: |
+        Repository commit SHA and any existing local modifications:
+        OS name, version/build, and architecture:
+        Browser name, full version, profile mode, extensions, and relevant flags:
+        Python version and executable used:
+        Installed Python dependency versions:
+        Node.js and npm versions (if used):
+        Launch command, working directory, and server URL/origin:
+        Launch method (start.bat, npm start, Python server, or static hosting):
+        Game version/source and loading method (installed copy or folder import):
+        Browser save state (new or existing; do not attach save files):
+        Hardware/GPU and driver version (if relevant):
+        Other relevant configuration:
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: How to reproduce
+      description: |
+        Give the starting state, prerequisites, and numbered steps another person can follow, including exact commands and inputs.
+        Include the expected and actual result, reproduction rate, and any conditions that prevent reproduction.
+        If reproduction is not yet reliable, describe the observed sequence and what remains unknown.
+      placeholder: |
+        Starting state and prerequisites:
+        1.
+        2.
+        3.
+        Expected result:
+        Actual result:
+        Reproduction rate (for example, 3 of 3 attempts):
+        Conditions or limitations:
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Direct supporting evidence
+      description: |
+        Provide sanitized terminal/browser-console output, exact errors, timestamps, or links to shareable evidence.
+        Connect each observation to a reproduction step. State evidence gaps explicitly; do not invent evidence.
+        Never include tokens, controller credentials, or .private/controller.json contents.
+        Keep proprietary assets, decompiled game code, game captures, native saves, and local analysis in ignored .private/;
+        do not upload them to this issue. Summarize relevant observations in text instead.
+      placeholder: |
+        Observation and matching reproduction step:
+        Timestamp and time zone:
+        Exact error or sanitized output:
+        Shareable evidence link (if available):
+        Missing evidence and reason (if any):
+    validations:
+      required: true
+
+  - type: textarea
+    id: suspected-causes
+    attributes:
+      label: Suspected causes
+      description: |
+        Label hypotheses as unconfirmed and explain which observations support or contradict each one.
+        Write "Unknown" if there is no evidence-based hypothesis. Do not propose patches, diffs, implementation plans,
+        or other code changes without explicit human authorization.
+      placeholder: |
+        Hypothesis (unconfirmed), or Unknown:
+        Supporting observations:
+        Contradicting observations or missing information:
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: authorization
+    attributes:
+      label: Human authorization requirement
+      options:
+        - label: "Do NOT propose code changes without explicit human authorization. This issue authorizes investigation and reporting only; it does not authorize proposing or making code changes."
+          required: true
