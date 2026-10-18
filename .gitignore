@@ -10,3 +10,4 @@ game.unx
 *.ogg
 *.wav
 .DS_Store
+.playwright-cli/

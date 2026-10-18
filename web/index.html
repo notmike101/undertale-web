@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101014">
+    <title>Undertale Web</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="style.css">
+    <script type="module" src="app.js"></script>
+</head>
+<body>
+    <header><a class="brand" href="./"><span aria-hidden="true">♥</span> UNDERTALE <small>WEB</small></a><span class="tag">YOUR GAME. YOUR SAVE.</span></header>
+    <main>
+        <section id="launcher" aria-labelledby="heading">
+            <p class="eyebrow">A familiar world. A new window.</p>
+            <h1 id="heading">Stay determined.</h1>
+            <p class="intro">Play your copy of Undertale in your browser.<br>Original game data. Local progress. No account.</p>
+            <div class="actions">
+                <button id="play-local" class="primary">Play installed copy <span aria-hidden="true">→</span></button>
+                <button id="import-folder">Import game folder</button>
+                <input id="folder" type="file" webkitdirectory multiple hidden aria-label="Select Undertale installation folder">
+            </div>
+            <p class="hint">Choose the folder containing <code>data.win</code> and the music files.<br>Your files stay on this device.</p>
+        </section>
+        <div id="status" role="status" aria-live="polite">Ready when you are.</div>
+        <section id="player" hidden aria-label="Undertale game">
+            <div class="game-frame"><canvas id="canvas" width="640" height="480" tabindex="0" aria-label="Undertale. Arrow keys to move, Z or Enter to confirm, X to cancel, C for menu."></canvas></div>
+            <div class="toolbar"><span id="save-status">Browser saves ready</span><div><button id="fullscreen">Fullscreen</button><button id="export-save">Export save</button><button id="restart">Relaunch</button></div></div>
+            <div class="touch-controls" aria-label="Touch game controls">
+                <div class="dpad"><button data-key="ArrowUp" aria-label="Move up">↑</button><button data-key="ArrowLeft" aria-label="Move left">←</button><button data-key="ArrowDown" aria-label="Move down">↓</button><button data-key="ArrowRight" aria-label="Move right">→</button></div>
+                <div class="action-pad"><button data-key="z">Z <small>Confirm</small></button><button data-key="x">X <small>Cancel</small></button><button data-key="c">C <small>Menu</small></button></div>
+            </div>
+        </section>
+        <section class="controls" aria-label="Keyboard controls"><span><kbd>↑ ↓ ← →</kbd> Move</span><span><kbd>Z</kbd> / <kbd>Enter</kbd> Confirm</span><span><kbd>X</kbd> / <kbd>Shift</kbd> Cancel</span><span><kbd>C</kbd> Menu</span></section>
+        <details><summary>Save import &amp; diagnostics</summary><div class="details-body"><label class="file-label">Restore an exported browser save <input id="import-save" type="file" accept=".json,application/json"></label><p>Restore before launching. Browser progress is separate from your Steam saves. Use the same browser and address to continue.</p><pre id="log" aria-label="Runtime log"></pre></div></details>
+    </main>
+    <footer><span>Powered by <a href="https://github.com/ButterscotchRunner/Butterscotch">Butterscotch</a> · WebAssembly / WebGL 2<br><a href="runtime/LICENSE">AGPL license</a> · <a href="runtime/butterscotch-source.zip">Runtime source</a></span><span>Unofficial. Undertale belongs to Toby Fox.</span></footer>
+</body>
+</html>
