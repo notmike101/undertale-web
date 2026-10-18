@@ -7,6 +7,7 @@ body:
         Complete every section. Use exact versions and commands; write "Unknown" or "Not applicable" with a reason where needed.
         Report observed behavior separately from upstream claims and suspected causes.
         Do NOT propose code changes without explicit human authorization. Filing this issue does not grant that authorization.
+        Do not attempt to include file attachments, either provide the content directly or provide a reusable link to the file.
 
   - type: textarea
     id: description
