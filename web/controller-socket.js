@@ -29,7 +29,7 @@ function showStatus(status) {
     const element = document.querySelector('#controller-status');
 
     if (element) {
-        element.textContent = `AI controller: ${status}`;
+        element.textContent = `Websocket controller: ${status}`;
     }
 }
 

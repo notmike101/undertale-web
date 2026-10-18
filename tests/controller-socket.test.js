@@ -167,7 +167,7 @@ test('controller bridge replays events, correlates commands, and releases contro
             data: JSON.stringify({ type: 'hello', sessionId: 'socket-check', latestSeq: 1 }),
         }));
         assert.deepEqual(replayCursors, [0, 1]);
-        assert.equal(status.textContent, 'AI controller: connected');
+        assert.equal(status.textContent, 'Websocket controller: connected');
         assert.deepEqual(connection.sent, [{ type: 'event', event: history[1] }]);
 
         for (const message of [
@@ -193,7 +193,7 @@ test('controller bridge replays events, correlates commands, and releases contro
         await yieldTurn();
         assert.equal(connection.closedWith, 4_013);
         assert.deepEqual(releases, [{ pause: true }]);
-        assert.equal(status.textContent, 'AI controller: disconnected');
+        assert.equal(status.textContent, 'Websocket controller: disconnected');
         stop();
         assert.equal(unsubscribed, true);
     } finally {
