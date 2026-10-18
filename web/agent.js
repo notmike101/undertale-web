@@ -1,5 +1,8 @@
+import { connectController } from './controller-socket.js';
+import { createTelemetry } from './controller-state.js';
+
 const keyCodes = {
-    ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40, Enter: 13, Escape: 27, Shift: 16, Backspace: 8,
+    ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40, Enter: 13, Escape: 27, Shift: 16, Control: 17, Backspace: 8,
     ...Object.fromEntries(Array.from('abcdefghijklmnopqrstuvwxyz0123456789 ', (key) => [key, key.toUpperCase().codePointAt(0)])),
     '.': 190, ',': 188, '-': 189, '=': 187, '!': 49, '?': 191, '/': 191, '\'': 222, ';': 186,
 };
@@ -22,12 +25,16 @@ function delay(milliseconds) {
  * @param {object} state - Shared runtime lifecycle state.
  * @param {HTMLCanvasElement} canvas - Game surface.
  * @param {() => Promise<boolean>} persistSaves - Save-flush callback.
- * @returns {void}
+ * @returns {object} Runtime attachment hook.
  */
 export function installAgent(state, canvas, persistSaves) {
     const held = new Set();
     let acting = false;
-    let observing = false;
+    let actionEpoch = 0;
+    const telemetry = createTelemetry();
+    let watchdog;
+    let latestSnapshot = null;
+    let sampledFrame = -1;
     let paused = false;
 
     /**
@@ -81,48 +88,44 @@ export function installAgent(state, canvas, persistSaves) {
      * Toggle the runner's existing pause control, leaving game state untouched.
      *
      * @param {boolean} value - Desired pause state.
-     * @returns {Promise<void>} Resolves after the input queue processes the toggle.
+     * @returns {void} Applies the pause state immediately.
      */
-    async function setPaused(value) {
-        if (!state.running || value === paused) {
+    function setPaused(value) {
+        if (!state.running) {
             return;
         }
 
-        state.runtime._onKeyDown(119);
-        await delay(80);
-        state.runtime._onKeyUp(119);
-        await delay(40);
-        paused = value;
+        state.runtime._agentSetPaused(value ? 1 : 0);
+        paused = Boolean(state.runtime._agentIsPaused());
         document.querySelector('#pause').textContent = paused ? 'Resume' : 'Pause';
+        telemetry.refresh(observe());
     }
 
     /**
      * Read the runner's own JSON state dump without modifying game variables.
      *
-     * @returns {Promise<object>} Current game state and lifecycle details.
+     * @returns {object} Current game state and lifecycle details.
      */
-    async function observe() {
+    function observe() {
         if (!state.running) {
             return { running: false, loading: state.loading, error: state.error, logs: state.logs.slice(-15) };
         }
 
-        if (observing) {
-            throw new Error('An observation is already in progress.');
+        const pointer = state.runtime._agentSnapshot();
+
+        if (!pointer) {
+            return { running: false, error: 'Runner is not ready.' };
         }
 
-        observing = true;
-
         try {
-            state.runtime._onKeyDown(122);
-            await delay(80);
-            state.runtime._onKeyUp(122);
-            await delay(40);
-            const snapshot = JSON.parse(state.runtime.FS.readFile('/state.json', { encoding: 'utf8' }));
+            const snapshot = JSON.parse(state.runtime.UTF8ToString(pointer));
 
-            return { running: true, paused, ...snapshot };
+            paused = snapshot.paused;
+            latestSnapshot = { running: true, ...snapshot };
+
+            return latestSnapshot;
         } finally {
-            state.runtime._onKeyUp(122);
-            observing = false;
+            state.runtime._free(pointer);
         }
     }
 
@@ -152,6 +155,7 @@ export function installAgent(state, canvas, persistSaves) {
 
         acting = true;
         const resumePause = paused;
+        const epoch = actionEpoch;
 
         try {
             if (resumePause) {
@@ -166,7 +170,7 @@ export function installAgent(state, canvas, persistSaves) {
         } finally {
             releaseAll();
 
-            if (resumePause) {
+            if (resumePause && epoch === actionEpoch) {
                 await setPaused(true);
             }
 
@@ -175,7 +179,7 @@ export function installAgent(state, canvas, persistSaves) {
 
         await delay(40);
 
-        return observe();
+        return look();
     }
 
     /**
@@ -189,12 +193,13 @@ export function installAgent(state, canvas, persistSaves) {
             throw new Error('Text input accepts up to 256 printable ASCII characters.');
         }
 
-        if (!state.running || acting || observing) {
+        if (!state.running || acting) {
             throw new Error('Launch the game and wait for the current action before typing.');
         }
 
         acting = true;
         const resumePause = paused;
+        const epoch = actionEpoch;
 
         /**
          * Deliver one character per game step interval.
@@ -203,6 +208,10 @@ export function installAgent(state, canvas, persistSaves) {
          * @returns {Promise<void>} Resolves after the remaining text is delivered.
          */
         async function typeNext(index) {
+            if (epoch !== actionEpoch) {
+                throw new Error('Text input cancelled because controller inputs were released.');
+            }
+
             if (index >= text.length) {
                 return;
             }
@@ -220,45 +229,79 @@ export function installAgent(state, canvas, persistSaves) {
 
             await typeNext(0);
         } finally {
-            if (resumePause) {
+            if (resumePause && epoch === actionEpoch) {
                 await setPaused(true);
             }
 
             acting = false;
         }
 
-        return observe();
+        return look();
     }
 
     /**
      * Return a compact observation suited to an agent's decision loop.
      *
-     * @returns {Promise<object>} Room, player stats, actors, and writer text fields.
+     * @returns {object} Current state, dialogue, history cursors, and contextual controls.
      */
-    async function look() {
-        const snapshot = await observe();
+    function look() {
+        return telemetry.look(observe());
+    }
 
-        if (!snapshot.running) {
-            return snapshot;
+    /**
+     * Validate a realtime key request before changing any key.
+     *
+     * @param {object} params - Key request.
+     * @param {boolean} down - Desired key state.
+     * @returns {object} Current compact observation.
+     */
+    function changeKeys(params, down) {
+        const keys = params?.keys;
+
+        if (!state.running || acting) {
+            throw new Error('Launch the game and wait for the current action.');
         }
 
-        const globals = snapshot.globalVariables;
+        if (!Array.isArray(keys) || keys.length > 16 || keys.some((key) => typeof key !== 'string' || !keyCodes[key.length === 1 ? key.toLowerCase() : key])) {
+            throw new Error('keys must be an array of at most 16 supported keys.');
+        }
 
-        return {
-            frame: snapshot.frame,
-            room: snapshot.room,
-            paused,
-            player: { hp: globals.hp, maxhp: globals.maxhp, lv: globals.lv, gold: globals.gold, plot: globals.plot, inbattle: globals.inbattle },
-            actors: snapshot.instances.map((instance) => ({ id: instance.instanceId, object: instance.objectName, x: instance.x, y: instance.y, visible: instance.visible, solid: instance.solid })),
-            dialogue: snapshot.instances.filter((instance) => /writer/iu.test(instance.objectName)).map((instance) => ({
-                object: instance.objectName,
-                text: Object.fromEntries(Object.entries(instance.selfVariables).filter(([, value]) => typeof value === 'string')),
-            })),
-        };
+        for (const key of keys) {
+            setKey(key, down);
+        }
+
+        clearTimeout(watchdog);
+
+        if (held.size > 0) {
+            watchdog = setTimeout(() => {
+                releaseAll();
+                setPaused(true);
+            }, 2_000);
+        }
+
+        return look();
+    }
+
+    /**
+     * Release real inputs and optionally freeze the game on disconnection.
+     *
+     * @param {object} [params] - Release options.
+     * @returns {Promise<object>} State after release.
+     */
+    async function releaseAgentKeys(params = {}) {
+        actionEpoch += 1;
+        releaseAll();
+        clearTimeout(watchdog);
+
+        if (params.pause === true) {
+            await setPaused(true);
+        }
+
+        return look();
     }
 
     globalThis.undertaleAgent = Object.freeze({
-        version: 1,
+        version: 2,
         keys: Object.keys(keyCodes),
         observe,
         look,
@@ -267,16 +310,39 @@ export function installAgent(state, canvas, persistSaves) {
         /**
          * Pause gameplay while an agent decides its next action.
          *
-         * @returns {Promise<void>} Resolves when paused.
+         * @returns {void} Pauses immediately.
          */
         pause: () => setPaused(true),
         /**
          * Return to continuous human gameplay.
          *
-         * @returns {Promise<void>} Resolves when resumed.
+         * @returns {void} Resumes immediately.
          */
         resume: () => setPaused(false),
         release: releaseAll,
+        releaseAll: releaseAgentKeys,
+        /**
+         * Hold keys for realtime play, with a two-second safety timeout.
+         *
+         * @param {object} params - Keys to hold.
+         * @returns {object} Current state.
+         */
+        keysDown: (params) => changeKeys(params, true),
+        /**
+         * Release selected realtime controls.
+         *
+         * @param {object} params - Keys to release.
+         * @returns {object} Current state.
+         */
+        keysUp: (params) => changeKeys(params, false),
+        /**
+         * Read controls expected in the current context.
+         *
+         * @returns {object} Contextual controls.
+         */
+        controls: () => look().controls,
+        dialogueHistory: telemetry.history,
+        events: telemetry.replay,
         save: persistSaves,
         /**
          * Capture the current game canvas as a PNG data URL.
@@ -291,6 +357,7 @@ export function installAgent(state, canvas, persistSaves) {
          */
         status: () => ({ running: state.running, loading: state.loading, paused, error: state.error, source: state.source, logs: state.logs.slice(-15) }),
     });
+    connectController(globalThis.undertaleAgent, telemetry);
     document.querySelector('#pause').addEventListener('click', async () => {
         await setPaused(!paused);
         canvas.focus();
@@ -332,4 +399,29 @@ export function installAgent(state, canvas, persistSaves) {
         button.addEventListener('pointercancel', releaseAll);
         button.addEventListener('lostpointercapture', releaseAll);
     }
+
+    return {
+        /**
+         * Observe every presented frame without advancing the game.
+         *
+         * @param {object} runtime - Initialized Emscripten runner.
+         * @returns {void}
+         */
+        attachRuntime(runtime) {
+            /**
+             * Capture rendered text and periodically refresh semantic state.
+             *
+             * @param {object} frame - Presented game frame.
+             * @returns {void}
+             */
+            runtime.onAgentFrame = (frame) => {
+                if (frame.frame !== sampledFrame && (frame.frame % 3 === 0 || !latestSnapshot || frame.room.index !== latestSnapshot.room.index)) {
+                    observe();
+                    sampledFrame = frame.frame;
+                }
+
+                telemetry.onFrame(frame, latestSnapshot);
+            };
+        },
+    };
 }

@@ -39,3 +39,15 @@ Delivered a playable browser build and AI controller. The user explicitly stoppe
 - WebGPU backend: uses working WebGL2 backend to prioritize the actual game.
 - No public deployment or game-asset redistribution.
 - No broad test suite, per user instruction. Focused evidence is in `docs/PLAYABILITY.md`.
+
+## Realtime controller upgrade (implemented)
+
+- Scope: runtime hooks, actions, rendered-text history, contextual guidance, loopback WebSocket broker, CLI and agent instructions.
+- Capture every frame's submitted text; separate rendered observations from queued script text.
+- Add session/sequence cursors, bounded replay with explicit gaps, and a controller lease. Preserve keyboard controls and browser-save isolation.
+- Native immediate pause/state observation; semantic state sampled every three game frames. Realtime key holds expire after two seconds; controller disconnect releases inputs and pauses.
+- Validate startup, draw capture, replay, action correlation, disconnect safety and zero-warning lint. No full playthrough.
+
+- Live controller checks passed: rendered text and history, immediate pause, bounded actions, sequenced replay, held-key watchdog, controller disconnect pause, and typing cancellation.
+- Focused JavaScript/Python controller checks passed; both required ESLint configs report zero warnings.
+- Protocol and decision-loop guidance are in docs/AI_PLAYING.md; interpretation limits and live evidence are in docs/PLAYABILITY.md.

@@ -30,3 +30,20 @@ After reloading the corrected application and starting the local game again:
 - `screenshot()` returned a PNG data URL, and a separate browser screenshot showed the rendered introduction.
 
 The opening was not replayed after this reload. The refreshed screenshot is retained privately as `.private/refreshed-startup.png`.
+
+## Realtime controller checks
+
+The upgraded native frame hook was exercised against the installed game in Chrome. Calling the immediate native snapshot from inside the presentation callback succeeded without a runtime error. Introductory text was reconstructed from real draw submissions and retained across pages; no game dialogue is copied into this repository.
+
+A persistent authenticated WebSocket client verified:
+
+- Direct pause froze the frame; a 700 ms no-key action advanced frame 656 to 676 and returned to paused state.
+- Seven rendered-text history records were available, and 11 events replayed without a sequence gap in the checked window.
+- State events, command response correlation, and reconnect catch-up operated through the live browser bridge.
+- A held right-arrow expired after the two-second watchdog and paused the game.
+- Disconnecting the controlling socket released input and paused. A new observer could read the result.
+- Cancelling text input with release-and-pause stopped the typing operation with an explicit cancellation error.
+
+Focused synthetic checks cover broker authentication/origin checks, leases, pending-command disconnects, retention gaps, browser transport, hidden queued-text exclusion, dialogue growth and disappearance, context precedence, and pause-state publication. Run `node --test tests/controller-state.test.js tests/controller-socket.test.js` and `py -3 tests/test_controller.py`. All passed, as did `npm run lint` with both requested configurations and zero warnings.
+
+These checks exercise the controller, not a full route. Rendered text is captured before compositing, so sprite lettering, clipping, offscreen surfaces, and later overdraw still require screenshot interpretation. Expected controls and text-page boundaries are inferred from game state and rendering evidence.

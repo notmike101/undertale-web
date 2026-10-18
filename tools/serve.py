@@ -16,8 +16,9 @@ class Handler(SimpleHTTPRequestHandler):
 
     extensions_map = {**SimpleHTTPRequestHandler.extensions_map, ".wasm": "application/wasm", ".js": "text/javascript"}
 
-    def __init__(self, *args, game_dir, **kwargs):
+    def __init__(self, *args, game_dir, controller_info, **kwargs):
         self.game_dir = game_dir
+        self.controller_info = controller_info
         super().__init__(*args, directory=str(ROOT / "web"), **kwargs)
 
     def end_headers(self):
@@ -37,7 +38,18 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         path = unquote(urlsplit(self.path).path)
-        if path == "/api/game":
+        if path == "/api/controller":
+            expected_host = f"127.0.0.1:{self.server.server_port}"
+            if self.headers.get("Host") != expected_host or self.headers.get("Origin") not in {None, f"http://{expected_host}"} or self.headers.get("Sec-Fetch-Site") == "cross-site":
+                self.send_error(403, "Controller configuration requires the local application origin")
+                return
+            data = json.dumps(self.controller_info).encode()
+            self.send_response(200 if self.controller_info.get("available") else 503)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+        elif path == "/api/game":
             assets = self.assets()
             if "data.win" not in assets:
                 self.send_error(404, "Undertale installation not found; use Import folder")
@@ -71,10 +83,20 @@ class Handler(SimpleHTTPRequestHandler):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8766)
+    parser.add_argument("--controller-port", type=int, default=8767)
     parser.add_argument("--game-dir", type=Path, default=DEFAULT_GAME)
     args = parser.parse_args()
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), partial(Handler, game_dir=args.game_dir.resolve()))
-    print(f"Undertale Web: http://127.0.0.1:{args.port}", flush=True)
+    controller_info = {}
+    server = ThreadingHTTPServer(("127.0.0.1", args.port), partial(Handler, game_dir=args.game_dir.resolve(), controller_info=controller_info))
+    try:
+        from controller import create_controller
+        controller_info.update(create_controller(server.server_port, args.controller_port), available=True)
+        print(f"AI controller: {controller_info['url']} (private local authentication)", flush=True)
+    except (ImportError, OSError, TimeoutError) as error:
+        message = "AI controller unavailable; install requirements.txt and check the controller port."
+        controller_info.update(available=False, error=message)
+        print(f"{message} ({type(error).__name__})", flush=True)
+    print(f"Undertale Web: http://127.0.0.1:{server.server_port}", flush=True)
     print("Original installation is read-only. Browser saves stay in this browser profile.", flush=True)
     try:
         server.serve_forever()

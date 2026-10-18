@@ -7,6 +7,7 @@ The browser host uses [Butterscotch](https://github.com/ButterscotchRunner/Butte
 ## Play on Windows
 
 ```powershell
+py -3 -m pip install -r requirements.txt
 py -3 tools/serve.py
 ```
 
@@ -34,7 +35,19 @@ await undertaleAgent.act(['z'], 80);
 await undertaleAgent.resume();
 ```
 
-The API supports observations, screenshots, bounded key actions, text entry and pause/resume. It uses real game inputs rather than editing game state.
+The local server also starts an authenticated WebSocket controller on `127.0.0.1:8767`. Agents can read live events, replay retained history, and control the running browser without repeatedly opening a browser automation tool:
+
+```powershell
+py -3 tools/agent_client.py look
+py -3 tools/agent_client.py watch
+py -3 tools/agent_client.py act ArrowRight --ms 250
+py -3 tools/agent_client.py history --after 0
+py -3 tools/agent_client.py screenshot .private/agent-view.png
+```
+
+`watch` emits JSONL and reconnects with its session/sequence cursor. Missing history is reported explicitly. One client at a time may control inputs; observers can remain connected. A one-shot command releases its control lease and pauses on disconnect. Keep a WebSocket connection open for continuous control. Connection credentials are generated in ignored `.private/controller.json`; do not copy them into prompts or logs. See the [protocol and examples](docs/AI_PLAYING.md#websocket-controller) for persistent clients.
+
+The APIs support observations, screenshots, key actions, text entry and pause/resume through real game inputs. Browser-side capture records rendered text every frame; compact state snapshots are sampled every three frames. This supplies recent context without requiring full state dumps after every input.
 
 ## Portable static hosting
 
@@ -45,6 +58,7 @@ Serve the contents of `web/` on HTTPS or localhost, using `application/wasm` for
 ```powershell
 npm ci
 npm run lint
+py -3 tests/test_controller.py
 py -3 tools/inspect_game.py --help
 pwsh -File scripts/setup-runtime.ps1
 ```

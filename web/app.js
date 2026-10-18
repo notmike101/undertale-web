@@ -225,6 +225,7 @@ async function launch(files) {
         });
 
         state.runtime = runtime;
+        agent.attachRuntime(runtime);
         runtime.specialHTMLTargets['#canvas'] = canvas;
         runtime.FS.mkdir('/game');
         runtime.FS.mkdir('/saves');
@@ -425,4 +426,4 @@ document.addEventListener('visibilitychange', () => {
         persistSaves();
     }
 });
-installAgent(state, canvas, persistSaves);
+const agent = installAgent(state, canvas, persistSaves);
