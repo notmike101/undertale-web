@@ -3,9 +3,9 @@ $repoRoot = Split-Path $PSScriptRoot -Parent
 $runtimeDir = Join-Path $repoRoot 'web/runtime'
 $privateDir = Join-Path $repoRoot '.private'
 $hashes = @{
-    'butterscotch.mjs' = 'FAD2F26692C9B61FED73090E4F378AFCADE8A09103FEFCB4B079EAF989ACE966'
-    'butterscotch.wasm' = 'B202189311012D24D5CBAF2F941FF40373A3CBAAD03A969BFE81C23E93AAF5D2'
-    'butterscotch-source.zip' = '0AFA091A94EC3115D0BB27CCEF7445FACEBF2EBAC7E773D967D3A9603B4519B8'
+    'butterscotch.mjs' = '92154A624B0086EB97C5CBAAF94CA0DFE078CE0587F170B9CB3D79491692283B'
+    'butterscotch.wasm' = '41A3297BAA56F41C544C25B8DD8DE5FA11C07CD2BA8FCB5E6FB2C6C53CDF4402'
+    'butterscotch-source.zip' = '1D78A595E3AD72B8362D6077748807593E979A79CCDCC05466B8BEEE28E9F1E3'
 }
 foreach ($name in $hashes.Keys) {
     $path = Join-Path $runtimeDir $name

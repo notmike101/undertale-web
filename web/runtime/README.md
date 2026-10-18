@@ -1,6 +1,6 @@
 # Butterscotch runtime
 
-WebAssembly runner based on [ButterscotchRunner/Butterscotch](https://github.com/ButterscotchRunner/Butterscotch), revision `f6f1d30a2f933e5e0e77941251c7bd38e361a2ce`, with one local browser text-input patch dated **2026-10-17**.
+WebAssembly runner based on [ButterscotchRunner/Butterscotch](https://github.com/ButterscotchRunner/Butterscotch), revision `f6f1d30a2f933e5e0e77941251c7bd38e361a2ce`, with local browser text-input and agent-observation patches dated **2026-10-17**.
 
 - Original upstream CI build: <https://github.com/ButterscotchRunner/Butterscotch/actions/runs/38919991284>
 - Original upstream artifact: <https://nightly.link/ButterscotchRunner/Butterscotch/actions/runs/38919991284/butterscotch-web.zip>
@@ -9,7 +9,7 @@ WebAssembly runner based on [ButterscotchRunner/Butterscotch](https://github.com
 
 No Undertale game data is included here. The runtime consumes the user's own GameMaker game files.
 
-The local patch adds an exported `onCharacter` input callback to `src/backends/web.c` and exports it in `CMakeLists.txt`. The upstream web backend forwarded key presses but did not update `keyboard_lastchar` or `keyboard_string`, preventing text entry such as the Mettaton essay. Character events now pass through the same frame input queue as key events and call the existing shared keyboard implementation. The patch is recorded in the repository's `patches/runtime.patch`; the source archive already includes it. There are no collision or gameplay-rule changes.
+The local patch adds an exported `onCharacter` input callback to `src/backends/web.c` and exports it in `CMakeLists.txt`. The upstream web backend forwarded key presses but did not update `keyboard_lastchar` or `keyboard_string`, preventing text entry such as the Mettaton essay. Character events now pass through the same frame input queue as key events and call the existing shared keyboard implementation. The backend also exposes snapshots, pause controls, and a per-frame text-draw observer; `src/gl/gl_renderer.c` captures game text draws and `src/runner.c` adds the existing pause flag to snapshots. The patch is recorded in the repository's `patches/runtime.patch`; the source archive already includes it and `LOCAL-CHANGES.md`. There are no collision or gameplay-rule changes.
 
 ## Restore
 
@@ -24,7 +24,7 @@ emcmake cmake -B build -G Ninja -DPLATFORM=web -DBACKEND=web -DCMAKE_BUILD_TYPE=
 cmake --build build
 ```
 
-Copy the resulting `build/butterscotch.mjs` and `build/butterscotch.wasm` together. A rebuild with a different SDK need not be byte-identical. The shipped files were rebuilt locally with the browser text-input patch described above.
+Copy the resulting `build/butterscotch.mjs` and `build/butterscotch.wasm` together. A rebuild with a different SDK need not be byte-identical. The shipped files were rebuilt locally with the patches described above.
 
 The Windows build used **Emscripten 6.0.12**, **CMake 4.4.4**, **Ninja 1.13.2**, and the SDK's **Python 3.13.3 / Node 24.19.0**. All tools were installed in ignored `.private/` folders, without permanent environment changes. After installing/activating that SDK in `.private/emsdk`, run `pwsh -File scripts/build-runtime.ps1`. CMake and Ninja may be on PATH or installed with `py -3 -m pip install --target .private/build-tools cmake==4.4.4 ninja==1.13.2`. The script builds `.private/Butterscotch` into `.private/runtime-build`; it does not automatically replace the shipped artifact.
 
@@ -44,11 +44,19 @@ Call `_onCharacter(characterCode)` for typed characters in addition to their key
 
 For observations, start with `--dump-frame-json-file /state.json`, then enqueue F11 (122). After the next frame, read `/state.json` as UTF-8 JSON. It contains `frame`, `room`, active `instances` with positions and self variables, `tiles`, and `globalVariables`. The observation is a snapshot, not a save-state format. Upstream handles `game_restart()` internally; `game_end()` resolves the start promise after cleanup, allowing the launcher to persist saves and offer relaunch.
 
+The patched `_agentSnapshot()` provides the same JSON synchronously, with a `paused` field, without injecting input or waiting for another frame. It returns a malloc-owned UTF-8 pointer, or zero when the runner is unavailable. Copy with `module.UTF8ToString(pointer)` and release with `module._free(pointer)` in `finally`. `_agentSetPaused(0|1)` and `_agentIsPaused()` use the existing runner pause implementation. These functions safely no-op or return zero when no game is running.
+
+Set `module.onAgentFrame = frame => { ... }` to receive every presented game frame. The callback receives `{ frame, room: { index, name }, paused, timestamp, draws, droppedDraws }`; timestamp is browser `performance.now()`. It executes after the framebuffer is committed and before the pending room transition is handled. Callback exceptions are logged without aborting gameplay. No callback is generated while an already-presented paused frame remains frozen.
+
+Each draw contains `{ text, x, y, scaleX, scaleY, angle, font, fontName, colorsBgr, alpha, halign, valign, lineSeparation, surface, applicationSurface, gui, viewport }`. `colorsBgr` contains the four corner colors in GameMaker's packed BGR format, and `viewport` has `x`, `y`, `width`, and `height`. The collector records game-font draw calls after font resolution, before their Draw event can advance or destroy a dialogue writer. It excludes the runner's debug font and draws with zero alpha. Coordinates are draw coordinates; clipping, later overdraw, and offscreen surfaces can affect actual visibility, so these are rendering observations rather than pixel OCR. Text drawn as sprites or images is not decoded.
+
+Collection is enabled only while `onAgentFrame` is a function. Each frame holds up to 4096 text calls; further calls increment `droppedDraws`, making truncation explicit. The browser layer is responsible for grouping glyphs into lines, retaining history, sequencing events, and reporting any subsequent history/transport drops. Full snapshots are requested independently rather than serialized automatically for every frame.
+
 ## SHA-256
 
 | File | SHA-256 |
 | --- | --- |
-| butterscotch.mjs | `fad2f26692c9b61fed73090e4f378afcade8a09103fefcb4b079eaf989ace966` |
-| butterscotch.wasm | `b202189311012d24d5cbaf2f941ff40373a3cbaad03a969bfe81c23e93aaf5d2` |
-| butterscotch-source.zip | `0afa091a94ec3115d0bb27ccef7445facebf2ebac7e773d967d3a9603b4519b8` |
+| butterscotch.mjs | `92154a624b0086eb97c5cbaaf94ca0dfe078ce0587f170b9cb3d79491692283b` |
+| butterscotch.wasm | `41a3297baa56f41c544c25b8dd8de5fa11c07cd2ba8fcb5e6fb2c6c53cdf4402` |
+| butterscotch-source.zip | `1d78a595e3ad72b8362d6077748807593e979a79ccdcc05466b8beee28e9f1e3` |
 | Upstream CI zip | `8ac4b5999fa4182aa5b70708bcbe1ff569cd6e43822970589ce466bdefb6c9df` |

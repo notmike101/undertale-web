@@ -5,7 +5,7 @@
                  "-sWASMFS=1"
                  "-sEXPORTED_RUNTIME_METHODS=['HEAP8', 'HEAPU8', 'HEAPF32', 'ccall', 'cwrap', 'specialHTMLTargets', 'UTF8ToString', 'stringToNewUTF8', 'setValue', 'FS']"
 -                "-sEXPORTED_FUNCTIONS=['_malloc', '_free', '_startRunner', '_mountOpfs', '_parseDataWin', '_getGameName', '_getGameDisplayName', '_freeDataWin', '_onKeyDown', '_onKeyUp', '_onMouseDown', '_onMouseUp', '_onMouseMove', '_requestRunnerExit']"
-+                "-sEXPORTED_FUNCTIONS=['_malloc', '_free', '_startRunner', '_mountOpfs', '_parseDataWin', '_getGameName', '_getGameDisplayName', '_freeDataWin', '_onKeyDown', '_onKeyUp', '_onCharacter', '_onMouseDown', '_onMouseUp', '_onMouseMove', '_requestRunnerExit']"
++                "-sEXPORTED_FUNCTIONS=['_malloc', '_free', '_startRunner', '_mountOpfs', '_parseDataWin', '_getGameName', '_getGameDisplayName', '_freeDataWin', '_onKeyDown', '_onKeyUp', '_onCharacter', '_onMouseDown', '_onMouseUp', '_onMouseMove', '_requestRunnerExit', '_agentSnapshot', '_agentSetPaused', '_agentIsPaused']"
                  "-sMIN_WEBGL_VERSION=2"
                  "-sMAX_WEBGL_VERSION=2"
                  "-sFULL_ES3=1"
@@ -19,7 +19,28 @@
      INPUTTYPE_MOUSE_BUTTON
  } typedef InputType;
  
-@@ -164,6 +165,15 @@
+@@ -103,6 +104,20 @@
+     gRequestedRunnerExit = true;
+ }
+ 
++char* agentSnapshot() {
++    if (!gInitialized || gRunner == nullptr || gRunner->currentRoom == nullptr)
++        return nullptr;
++    return Runner_dumpStateJson(gRunner);
++}
++
++void agentSetPaused(int paused) {
++    if (gRunner != nullptr) Runner_setPaused(gRunner, paused != 0);
++}
++
++int agentIsPaused() {
++    return gRunner != nullptr && Runner_isPaused(gRunner);
++}
++
+ void platformLog(MAYBE_UNUSED const logType type, const char *format, va_list va) {
+     vfprintf(stdout, format, va);
+ }
+@@ -164,6 +179,15 @@
      gInputQueue[entryIndex].down = true;
  }
  
@@ -35,7 +56,47 @@
  void onMouseUp(int button) {
      if (gInputCount == MAX_KEY_QUEUE)
          return;
-@@ -246,6 +256,10 @@
+@@ -191,6 +215,8 @@
+ 
+ void platformExit(void) {
+     gInitialized = false;
++    gRunner = nullptr;
++    EM_ASM({ Module.agentTextDraws = null; });
+     emscripten_webgl_destroy_context(gWebGLContextHandle);
+ }
+ 
+@@ -234,6 +260,21 @@
+ 
+ void platformSwapBuffers(void) {
+     emscripten_webgl_commit_frame();
++    if (gRunner != nullptr && gRunner->currentRoom != nullptr) {
++        EM_ASM({
++            if (typeof Module.onAgentFrame !== 'function') return;
++            const frame = ({
++                frame: $0,
++                room: { index: $1, name: UTF8ToString($2) },
++                paused: !!$3,
++                timestamp: performance.now(),
++                draws: Module.agentTextDraws || [],
++                droppedDraws: Module.agentTextDropped || 0
++            });
++            try { Module.onAgentFrame(frame); }
++            catch (error) { console.error('Agent frame observer failed', error); }
++        }, gRunner->frameCount, gRunner->currentRoomIndex, gRunner->currentRoom->name, gRunner->paused);
++    }
+ }
+ 
+ void *platformGetProcAddress(MAYBE_UNUSED const char *name) {
+@@ -241,11 +282,19 @@
+ }
+ 
+ bool platformHandleEvents(void) {
++    EM_ASM({
++        Module.agentTextDraws = typeof Module.onAgentFrame === 'function' ? [] : null;
++        Module.agentTextDropped = 0;
++    });
+     int inputIndex = 0;
+     while (gInputCount != inputIndex) {
          InputEntry entry = gInputQueue[inputIndex];
  
          switch (entry.inputType) {
@@ -46,3 +107,79 @@
              case INPUTTYPE_KEY: {
                  if (entry.down) {
                      RunnerKeyboard_onKeyDown(gRunner->keyboard, entry.key);
+--- a/src/gl/gl_renderer.c
++++ b/src/gl/gl_renderer.c
+@@ -3,6 +3,10 @@
+ #include "text_utils.h"
+ #include "runner.h"
+ #include "file_system.h"
++
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++#endif
+ 
+ #if defined(__EMSCRIPTEN__) || defined(__ANDROID__) || defined(__SWITCH__)
+ #include <GLES3/gl3.h>
+@@ -2094,6 +2098,33 @@
+     int32_t textLen = (int32_t) strlen(text);
+     if (textLen == 0)
+         return;
++
++#ifdef __EMSCRIPTEN__
++    // Observe game text draw calls before Draw events can advance or destroy a writer.
++    if (fs == nullptr && alpha > 0.0f && renderer->runner != nullptr) {
++        float observation[] = { x, y, xscale, yscale, angleDeg, (float) renderer->drawFont,
++            (float) _c1, (float) _c2, (float) _c3, (float) _c4, alpha,
++            (float) renderer->drawHalign, (float) renderer->drawValign, lineSeparation,
++            (float) Runner_surfaceGetTarget(renderer->runner), (float) renderer->runner->applicationSurfaceId,
++            (float) renderer->runner->inGuiPass, (float) renderer->CPortX, (float) renderer->CPortY,
++            (float) renderer->CPortW, (float) renderer->CPortH };
++        EM_ASM({
++            const draws = Module.agentTextDraws;
++            if (!draws) return;
++            if (draws.length >= 4096) { Module.agentTextDropped++; return; }
++            const v = HEAPF32.subarray($2 >> 2, ($2 >> 2) + 21);
++            draws.push({
++                text: UTF8ToString($0), x: v[0], y: v[1],
++                scaleX: v[2], scaleY: v[3], angle: v[4],
++                font: v[5], fontName: UTF8ToString($1),
++                colorsBgr: [v[6] >>> 0, v[7] >>> 0, v[8] >>> 0, v[9] >>> 0], alpha: v[10],
++                halign: v[11], valign: v[12], lineSeparation: v[13],
++                surface: v[14], applicationSurface: v[15], gui: !!v[16],
++                viewport: { x: v[17], y: v[18], width: v[19], height: v[20] }
++            });
++        }, text, font->name, observation);
++    }
++#endif
+ 
+     // Count lines, treating \r\n and \n\r as single breaks
+     int32_t lineCount = TextUtils_countLines(text, textLen);
+--- a/src/runner.c
++++ b/src/runner.c
+@@ -4888,6 +4888,7 @@
+     JsonWriter_beginObject(&w);
+ 
+     JsonWriter_propertyInt(&w, "frame", runner->frameCount);
++    JsonWriter_propertyBool(&w, "paused", runner->paused);
+ 
+     // Room info
+     JsonWriter_key(&w, "room");
+--- /dev/null
++++ b/LOCAL-CHANGES.md
+@@ -0,0 +1,16 @@
++# Local modification notice — 2026-10-17
++
++Based on ButterscotchRunner/Butterscotch revision `f6f1d30a2f933e5e0e77941251c7bd38e361a2ce`.
++
++`src/backends/web.c` adds a character event type, an `onCharacter(unsigned int)` entry point, and delivery to the existing `RunnerKeyboard_onCharacter` implementation through the frame input queue. This restores browser text entry through `keyboard_lastchar` and `keyboard_string`.
++
++The same backend adds synchronous read-only `agentSnapshot`, explicit pause setters/getters using the existing runner pause API, and an optional per-presented-frame JavaScript observer. `src/gl/gl_renderer.c` records game text draw calls for that observer, including placement, font, colors, alpha, and surface context; this captures text before a Draw event changes or destroys its writer. Collection is disabled unless a JavaScript `onAgentFrame` callback is installed. Each frame includes an explicit dropped-draw count if the 4096-call limit is reached. `src/runner.c` adds the existing pause flag to the JSON snapshot. `CMakeLists.txt` exports the added functions. No collision or gameplay rules were changed.
++
++Built on Windows with Emscripten 6.0.12, CMake 4.4.4, Ninja 1.13.2, and Emscripten SDK Python 3.13.3 / Node 24.19.0:
++
++```sh
++emcmake cmake -B build -G Ninja -DPLATFORM=web -DBACKEND=web -DCMAKE_BUILD_TYPE=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
++cmake --build build --parallel 8
++```
++
++The complete upstream source and dependency license notices remain in this archive. See LICENSE for GNU AGPL v3 terms.
