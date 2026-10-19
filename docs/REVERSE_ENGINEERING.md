@@ -184,3 +184,31 @@ to an unresolved mutability question rather than presented as a confirmed bug.
 
 No tests were created or run for this inspection, as requested. The inventory
 and decompiler commands were executed to produce the static evidence.
+
+## Overworld movement and collision semantics (issue 7)
+
+Observed through browser state sampling against the runner, cross-checked against
+the original `data.win` object and sprite records in `.private/utmt/`.
+
+- Door warps are contact-based: the player's Step runs
+  `with (collision_rectangle(bbox_left, bbox_top, bbox_right, bbox_bottom, obj_doorparent, 0, 0)) event_user(9);`
+  every step, and the door's `Alarm_2` then sets `global.entrance`, creates
+  `obj_persistentfader`, and calls `room_goto`/`room_goto_next`. No confirm key
+  is involved. Contact warps were observed at every door family instance used
+  during a fresh run (`doorA`, `doorB`, the corridor and ruins door zones).
+- Solid actors block the player through GameMaker-style family collision, and
+  bounding boxes are inclusive on both edges: a wall whose top row equals the
+  player's bottom row blocks north movement. The Ruins entrance save point at
+  (150,195) and the ramp-wall family sealing x≈180–219 around y≈160–212 wedge
+  the spawn lane at y≈198 for any x through x≈171–219.
+- The diagonal family (`obj_sul`/`obj_sur`/`obj_sdr`/`obj_sdl`, parented to
+  `obj_diagoparent`) steps the player sideways while climbing: holding Up on a
+  slope shifts x by three per three-pixel climb, and a side collision snaps x to
+  a multiple of three, which the spawn x=150 keeps aligned. The row-by-row mask
+  tables decoded from the original sprite bytes predict the exact rows where the
+  browser probes wedged and slid.
+- The save point's solid flag is recorded in the original object-definition
+  parse. Its GML event table (`Create_0`, `Step_1`, `Alarm_0`) contains no
+  `solid` reference, and the player's Step does not write other objects' flags.
+  The report's claim that interacting changes solidity therefore has no code
+  path; the observed post-use `solid: true` equals the value present from load.
