@@ -61,3 +61,13 @@ Delivered a playable browser build and AI controller. The user explicitly stoppe
 - Centering correction: explicit viewport-sized black stage and independently sized, absolutely centered game surface. Browser assertions passed at 600x900, 1280x720 and 900x900; stylesheet URL refreshed to invalidate stale styling.
 
 - Diagnostics now use a fixed bottom-left expandable overlay, available before launch and in fullscreen. Verified expansion does not move/resize the canvas; live log and fullscreen visibility pass. ESLint: zero warnings.
+
+## Save durability and save management (implemented, issue #14)
+
+- Owner-endorsed shape: keep the IndexedDB snapshot model, request durable storage, evolve the single implicit snapshot into user-visible save records.
+- `web/app.js` stores `save:<id>` records (label, createdAt, updatedAt, files) plus a `meta` active pointer in the same object store. The legacy `undertale` key migrates once into an "Original browser save" record. Periodic flushes rewrite only the active record.
+- Launcher save list: label, capture time and detected game files per entry; new save, select (Use), inline rename, per-save export and two-click delete. Backup import adds a new entry. Launch reloads records under the Web Locks lease.
+- `navigator.storage.persist()` is requested on user gestures; the launcher reports the actual durable/evictable state and never claims durability the browser did not grant.
+- Controller `save` still means "flush the active save". Management mutations acquire the same `navigator.locks` lease as launch, so running games serialize against management and other tabs.
+- `pagehide` now also flushes; exit, Restart and tab-hide keep awaited or started final flushes.
+- Live browser checks recorded in docs/PLAYABILITY.md. ESLint: zero warnings; controller node tests pass.

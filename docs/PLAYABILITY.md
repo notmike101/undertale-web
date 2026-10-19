@@ -72,3 +72,17 @@ Observed on October 19, 2026 in a headed Chrome session against the local app, f
 Native parity for the geometry: the original `data.win` object-definition parse records the save point as solid at definition, and the byte-decoded diagonal sprite masks (`spr_sul`/`spr_sur`, `.private/utmt/`) produce the same inclusive-edge lane table the browser wedges reproduced: x≈180–219 sealed at the corridor row, with slope rows narrowing two columns per row, which drives the observed ±3 auto-slide. The native game clamps the `room_area1` right edge at x=640 where the browser clamps at 639–640. A parallel scripted full-route native run stopped at the Flowey battle when the key-injection harness pressed the game-over screen's quit button; that is a harness limitation and not a game-behavior result, and the native wedge coordinate itself rests on the static masks plus earlier native exploration shots rather than on that run.
 
 This validates the Ruins entrance through `room_ruins3` in this session. It is not evidence about later rooms.
+
+## Save management and durable storage checks (2026-10-19, issue #14 branch)
+
+Checked at `http://127.0.0.1:8766` (managed Chromium with WebAssembly JSPI, loopback dev server) using seeded IndexedDB state. These are save-subsystem checks, not gameplay-route evidence.
+
+- Fresh profile: launcher listed no saves and reported storage as not durable; `navigator.storage.persisted()` was `false`.
+- Migration: a seeded legacy `undertale` key (`file0`, `file9`, `undertale.ini`) became one "Original browser save" entry (capture time unknown, active); the legacy key was replaced by `save:<id>` plus `meta` with no byte loss.
+- After a user-gesture persistence request, `navigator.storage.persisted()` returned `true` and the launcher switched to its durable wording.
+- Management: New save created and selected; inline rename ("Run A — Chara") persisted; Use moved the active marker; Export produced `undertale-web-save-v1` JSON with the exact stored bytes; Delete required a second "Confirm delete" click and removed only that entry.
+- Import: a valid backup joined the list as a new active entry; the Restore-save format is unchanged.
+- Resume wiring: with "Run A" selected, launching the installed copy restored its sentinel `file0` bytes and a `undertaleAgent.save()` flush wrote the same bytes back to the same record. After selecting the imported save and relaunching via Restart, that record held the import bytes (7,7,7,66,65,67,75,85,80) rather than Run A's (1,2,3,76,79,…), so each entry resumes its own contents. After deleting the imported entry, Run A remained intact and active.
+- Concurrency: while the game ran in one tab, a second tab still listed saves, but launching and a committed rename failed with the Web Locks error and left stored labels unchanged.
+- Abrupt close mid-game: the active record's `updatedAt` advanced during tab close (the `pagehide`-started IndexedDB transaction committed); sibling records were untouched. Restart performs an awaited flush before reload.
+- Gaps: a real in-game named-character SAVE -> close -> relaunch -> Continue cycle through this multi-save layer was not exercised (synthetic sentinel files were used); Firefox behavior remains untested. ESLint stayed at zero warnings and the controller node tests passed.

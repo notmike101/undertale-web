@@ -19,7 +19,7 @@ For another installation:
 py -3 tools/serve.py --game-dir "D:\Games\Undertale" --port 8766
 ```
 
-The installation is read-only. Native Steam saves are not touched. Browser progress lives in IndexedDB for this exact address and browser profile. Use the game's normal SAVE points; export a backup with **Export save**. A different port, hostname or browser profile has separate progress.
+The installation is read-only. Native Steam saves are not touched. Browser progress lives in IndexedDB for this exact address and browser profile. Before launching, the launcher lists your browser saves with a label, capture time and detected game files: create a new save for a separate playthrough, select which save a launch resumes, and rename, export or delete individual saves. Importing a backup adds a new entry instead of replacing everything, and an existing single browser save migrates into the list automatically. The app requests durable browser storage on launch and shows the browser's actual storage state. Use the game's normal SAVE points; export a backup with **Export save**. A different port, hostname or browser profile has separate progress.
 
 **Controls:** arrows move, Z/Enter confirm, X/Shift cancel, C opens the menu. The game scales to contain its original 640×480 image in the full viewport. Open the top-left menu for pause/resume, fullscreen, save export and restart. AI controller status overlays the top-right corner. Ordinary typed text and Backspace are forwarded for in-game text entry.
 

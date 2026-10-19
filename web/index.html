@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#000000">
     <title>Undertale Web</title>
     <link rel="icon" href="data:,">
-    <link rel="stylesheet" href="style.css?v=diagnostics-overlay">
+    <link rel="stylesheet" href="style.css?v=save-management">
     <script type="module" src="app.js"></script>
 </head>
 <body>
@@ -15,9 +15,16 @@
             <button id="play-local">Play installed copy</button>
             <button id="import-folder">Import game folder</button>
             <input id="folder" type="file" webkitdirectory multiple hidden aria-label="Select Undertale installation folder">
+            <section id="save-list" aria-label="Browser saves">
+                <p id="storage-status" role="status">Checking browser storage…</p>
+                <ul id="saves"></ul>
+                <div class="save-list-actions">
+                    <button id="new-save">New save</button>
+                </div>
+            </section>
             <details>
-                <summary>Restore save</summary>
-                <label>Browser save <input id="import-save" type="file" accept=".json,application/json"></label>
+                <summary>Restore save backup</summary>
+                <label>Backup JSON <input id="import-save" type="file" accept=".json,application/json"></label>
             </details>
         </section>
         <div id="status" role="status" aria-live="polite"></div>

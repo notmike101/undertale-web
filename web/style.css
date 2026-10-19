@@ -71,6 +71,56 @@ button:disabled {
     padding: 16px;
 }
 
+#save-list {
+    flex-basis: 100%;
+    width: min(760px, calc(100vw - 48px));
+    font-size: 11px;
+    color: #aaa;
+}
+
+#save-list ul {
+    display: grid;
+    gap: 8px;
+    margin: 8px 0;
+    padding: 0;
+    list-style: none;
+}
+
+#save-list li {
+    border: 1px solid #35483f;
+    border-radius: 3px;
+    padding: 8px 10px;
+    text-align: left;
+}
+
+#save-list li.active {
+    border-color: #f5d94a;
+}
+
+#save-list p {
+    margin: 0 0 6px;
+}
+
+#save-list .save-meta {
+    color: #888;
+}
+
+.save-actions,
+.save-list-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.save-actions button {
+    padding: 4px 10px;
+}
+
+.save-name {
+    width: min(320px, 60vw);
+    margin-right: 6px;
+}
+
 input {
     font: inherit;
     max-width: 100%;

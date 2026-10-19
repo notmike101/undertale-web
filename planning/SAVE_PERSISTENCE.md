@@ -57,3 +57,7 @@ Hypothesis (unconfirmed): options 1+2 are the minimal durable base; option 3 cou
 - No end-to-end named-game SAVE → close → relaunch → Continue run under the current build.
 - `_mountOpfs()` argument handling, error modes, and OPFS worker behavior untested.
 - Persistence flush on abrupt tab close is `visibilitychange`-only and fire-and-forget; whether the final IndexedDB transaction commits was not tested (hypothesis only).
+
+## Status update (2026-10-19)
+
+Implemented on branch `feat/durable-save-management` with owner authorization in the [issue #14 comment](https://github.com/notmike101/undertale-web/issues/14#issuecomment-6271884098): the IndexedDB snapshot model stayed, durable storage is requested and reported, and the single snapshot became user-visible save records with startup management. Options 3 (OPFS `_mountOpfs()`) and 4 (File System Access) remain unused. Live results and remaining gaps are recorded in `docs/PLAYABILITY.md`.
