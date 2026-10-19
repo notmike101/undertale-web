@@ -56,6 +56,8 @@ Replies contain the same `id`, `type: "response"`, and either `ok: true` with `r
 
 The broker gives only one connected client the mutating lease. Other clients can observe and watch events but receive `control_busy` when attempting mutations. Mutating commands are serialized: await each reply. When the controlling client disconnects or releases its lease, the broker asks the browser to release all inputs and pause. Disconnecting an observer does not pause gameplay. A one-shot CLI mutation therefore pauses on exit, including `resume`; use a persistent connection to keep gameplay running.
 
+The browser side also guards its own bridge. If the page's `/bridge` connection drops — a server restart, or a frozen/backgrounded tab whose heartbeat expires — the browser releases any held keys and pauses an active game, showing the runner's two-bar pause overlay on the canvas. The page log records the auto-pause, `look()` and `status()` report `paused: true`, and `frame` stays frozen until `resume()` (or a human clicking **Resume**) returns gameplay to continuous motion.
+
 The broker retains at most 4,096 events or 8 MiB, whichever fills first. Browser reconnects resend retained events after the broker's last sequence. A missing prefix, sequence jump, or new browser session is explicit in replay/watch output. History is bounded diagnostic context, not a permanent transcript: callers needing durable history should save the JSONL locally. Server restarts discard broker history, and browser reloads start a new game session.
 
 Rendered-text capture runs every presented frame, and compact state sampling runs every three frames: nominally 30 Hz text capture and 10 Hz state sampling at the game's 30 FPS. This is not a scheduling guarantee. Pausing stops frame presentation, and rendering delays can reduce these rates. See the practical decision guide below before treating captured text as dialogue or choosing an input.
@@ -64,7 +66,7 @@ Rendered-text capture runs every presented frame, and compact state sampling run
 
 | Call | Result / behavior |
 | --- | --- |
-| `status()` | Synchronous lifecycle, error, source, pause state, last 15 log messages, and `input` pipeline counters (`pendingInjections`, `injectedEvents`, `gatedWaits`, `stalledActions`, `rejectedInjections`, `healedReleases`, `maxPendingInjections`). |
+| `status()` | Synchronous lifecycle, error, source, live pause state, last 15 log messages, and `input` pipeline counters (`pendingInjections`, `injectedEvents`, `gatedWaits`, `stalledActions`, `rejectedInjections`, `healedReleases`, `maxPendingInjections`). |
 | `look()` | Current compact state: context, control hints, player/battle data, rendered text, writer progress, actors, and capture provenance. Start here. |
 | `observe()` | Raw runner snapshot including instances, variables, tiles and globals. It can contain queued or future text that has not been displayed. It is not the visible dialogue feed. |
 | `screenshot()` | PNG data URL of the game canvas. Browser screenshots are also supported and show the surrounding controls. |
@@ -89,7 +91,8 @@ Normal controls: arrows move/select; Z or Enter confirms/interacts; X or Shift c
 
 | Field | How to use it |
 | --- | --- |
-| `sessionId`, `frame`, `room` | Identify the current run and room. Reset your history cursors when the session changes. |
+| `sessionId`, `frame`, `room` | Identify the current run and room. Reset your history cursors when the session changes. `frame` advances only while the runner presents frames; pause or a frozen tab freezes it, so an unchanged `frame` across calls means no simulated frames, not a healthy running game. |
+| `paused` | Live runner pause flag, read from the same runner state as `status().paused`; the two views agree. The pause overlay on the canvas, paused input, and this field always describe the same pause state. |
 | `snapshotFrame`, `snapshotAgeFrames` | Check how old the sampled variables are relative to the presented frame. A state event may lag the newest rendered text by a few frames. |
 | `context`, `controls` | An inferred control mode, specific observed conditions, selection details, and available input hints. Bespoke scenes can behave differently; use screenshots when the inference is uncertain. |
 | `player`, `battle` | Selected player/battle variables such as HP, maximum HP, LV, plot, battle phase, and target health. Absent fields are not known values. |
@@ -264,7 +267,7 @@ This example stops on a transport failure instead of replaying a potentially com
 ## Limits
 
 - The controller is implemented and opening gameplay has been exercised; this is not a claim that an autonomous agent has completed a route.
-- Pause/resume and input use the actual runner. The game is not paused automatically just because an agent is thinking unless `pause()` was called.
+- Pause/resume and input use the actual runner. The game is not paused automatically just because an agent is thinking unless `pause()` was called. A lost browser-to-broker bridge does auto-pause an active game (see the WebSocket controller section).
 - ASCII text input matches this runner's character-input support. IME/non-ASCII composition is not implemented.
 - Use one active game tab per origin. The launcher takes a browser lock to protect saves from another tab.
 - The WebSocket broker is available with the included local Python server. Static hosting retains the browser API but has no local broker by itself.

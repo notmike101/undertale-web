@@ -207,6 +207,23 @@ export function installAgent(state, canvas, persistSaves, log) {
     }
 
     /**
+     * Read the runner's live pause flag and keep the cached field in step.
+     *
+     * Both `look()` and `status()` must answer from the runner's current state,
+     * never from a value that a later runner-side change silently outran. The
+     * cache only survives for lifecycle phases with no runner to query.
+     *
+     * @returns {boolean} Whether the runner is currently paused.
+     */
+    function livePaused() {
+        if (state.running && state.runtime) {
+            paused = Boolean(state.runtime._agentIsPaused());
+        }
+
+        return paused;
+    }
+
+    /**
      * Toggle the runner's existing pause control, leaving game state untouched.
      *
      * @param {boolean} value - Desired pause state.
@@ -236,7 +253,11 @@ export function installAgent(state, canvas, persistSaves, log) {
         const pointer = state.runtime._agentSnapshot();
 
         if (!pointer) {
-            return { running: false, error: 'Runner is not ready.' };
+            /*
+               The runner exists but has no dumpable room; still report its live
+               pause flag so look() can never fall back to a stale frame's flag.
+             */
+            return { running: false, paused: livePaused(), error: 'Runner is not ready.' };
         }
 
         try {
@@ -528,11 +549,12 @@ export function installAgent(state, canvas, persistSaves, log) {
          *
          * @returns {object} Current runtime lifecycle, recent logs, and input pipeline counters.
          */
-        status: () => ({ running: state.running, loading: state.loading, paused, error: state.error, source: state.source, logs: state.logs.slice(-15), input: { pendingInjections, ...inputHealth, maxPendingInjections: MAX_PENDING_INJECTIONS } }),
+        status: () => ({ running: state.running, loading: state.loading, paused: livePaused(), error: state.error, source: state.source, logs: state.logs.slice(-15), input: { pendingInjections, ...inputHealth, maxPendingInjections: MAX_PENDING_INJECTIONS } }),
     });
-    connectController(globalThis.undertaleAgent, telemetry);
+    connectController(globalThis.undertaleAgent, telemetry, log);
+
     document.querySelector('#pause').addEventListener('click', async () => {
-        await setPaused(!paused);
+        await setPaused(!livePaused());
         canvas.focus();
     });
     canvas.addEventListener('click', () => canvas.focus());
