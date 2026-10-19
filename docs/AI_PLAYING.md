@@ -167,6 +167,14 @@ Play according to the human's requested route. Do not change game globals, jump 
 
 When the game intentionally closes, `status().running` becomes false and the page offers **Restart**. Relaunch preserves the game's persistent files, which Undertale may use across restarts. Do not clear browser storage to bypass the game's consequences.
 
+### Movement in solid geometry
+
+Drain confirmation proves the runner received your keys, not that the player can move there. Overworld geometry is solid, and so are NPCs. After two consecutive same-direction `act()` moves that leave the player at exactly one position, the `look()`/`act()` result carries `movement: { blocked: true, direction, attempts, x, y }`. That means solid geometry blocks that lane — stop re-pressing the direction and move on a perpendicular axis around the obstacle. The marker clears once the player moves or the attempted direction changes.
+
+Observed in the original rules: collision bounding boxes are inclusive on both edges (a wall whose bottom row equals the player's top row blocks downward movement), some rooms snap the player's x to multiples of three after side collisions, and holding only Up against a diagonal slope auto-slides one step sideways (x ±3) per step upward. Solid NPCs hard-stop walking with no dialogue.
+
+Worked example, the Ruins entrance (`room_ruins1`): the spawn lane x=150 has a solid SAVE point at (150,195) and a ramp wall covering x≈180–239 around y≈160–212, so walking straight north from spawn wedges at y≈198 for any x through x≈171–219. The verified route keeps x≤171 up to the SAVE point's left, or steps east past the wall (x≥220) and walks the open east lane north to the door. The door warps on contact; no confirm key is required.
+
 ## Persistent Python decision loop
 
 Run this from the repository root with the game already started. It reuses the CLI's credential loading and initial replay helper, then keeps a receiver running while a human or model decides. Requests are correlated with replies while events update the current scene. The example prompts for each decision instead of choosing a route: enter, for example, `{"method":"act","params":{"keys":["ArrowRight"],"milliseconds":100}}` only after checking that moving right is appropriate. Enter `quit` to release control. Replace the `input` call with your agent's decision function when integrating a model.

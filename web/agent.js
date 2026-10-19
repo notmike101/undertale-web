@@ -59,6 +59,9 @@ export function installAgent(state, canvas, persistSaves, log) {
     let queueFloorFrame = null;
     let lastPresentedFrame = -1;
     const inputHealth = { injectedEvents: 0, gatedWaits: 0, stalledActions: 0, rejectedInjections: 0, healedReleases: 0 };
+    const directionKeys = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+    /** @type {{ direction: string, attempts: number, x: number, y: number } | null} */
+    let movementStreak = null;
 
     /**
      * Record events written into the runner's per-frame input queue.
@@ -70,6 +73,58 @@ export function installAgent(state, canvas, persistSaves, log) {
         pendingInjections += count;
         inputHealth.injectedEvents += count;
         queueFloorFrame = lastPresentedFrame;
+    }
+
+    /**
+     * Compare the player position before and after a registered movement action.
+     *
+     * Consecutive same-direction actions that leave the player at one position
+     * mean a solid obstacle blocks that lane, not that input was lost. The
+     * streak resets when the player moves or the attempted direction changes.
+     *
+     * @param {string[]} keys - Keys held by the completed action.
+     * @param {object|null} before - Player position recorded before the action.
+     * @param {object|null} after - Player position from the observation after the action.
+     * @returns {void}
+     */
+    function noteMovement(keys, before, after) {
+        const direction = keys.filter((key) => directionKeys.has(key)).sort().join('+');
+
+        if (!direction || !before || !after || typeof before.x !== 'number' || typeof after.x !== 'number' || typeof before.y !== 'number' || typeof after.y !== 'number') {
+            movementStreak = null;
+
+            return;
+        }
+
+        if (before.x === after.x && before.y === after.y) {
+            if (movementStreak && movementStreak.direction === direction) {
+                movementStreak.attempts += 1;
+            } else {
+                movementStreak = { direction, attempts: 1, x: after.x, y: after.y };
+            }
+        } else {
+            movementStreak = null;
+        }
+    }
+
+    /**
+     * Describe the current blocked-movement streak, if any.
+     *
+     * @returns {object|null} Stall advice after two unchanged same-direction actions, otherwise null.
+     */
+    function movementAdvice() {
+        if (!movementStreak || movementStreak.attempts < 2) {
+            return null;
+        }
+
+        return {
+            blocked: true,
+            direction: movementStreak.direction,
+            attempts: movementStreak.attempts,
+            x: movementStreak.x,
+            y: movementStreak.y,
+            hint: 'The player stayed at one position across registered movement actions, so a solid object blocks that direction. Try a perpendicular direction.',
+        };
     }
 
     /**
@@ -301,6 +356,7 @@ export function installAgent(state, canvas, persistSaves, log) {
         acting = true;
         const resumePause = paused;
         const epoch = actionEpoch;
+        const beforePlayer = look().player ?? null;
 
         try {
             if (resumePause) {
@@ -351,7 +407,18 @@ export function installAgent(state, canvas, persistSaves, log) {
 
         await delay(40);
 
-        return look();
+        const scene = look();
+
+        noteMovement(keys, beforePlayer, scene.player ?? null);
+        const advice = movementAdvice();
+
+        if (advice) {
+            scene.movement = advice;
+        } else {
+            delete scene.movement;
+        }
+
+        return scene;
     }
 
     /**
@@ -424,7 +491,14 @@ export function installAgent(state, canvas, persistSaves, log) {
      * @returns {object} Current state, dialogue, history cursors, and contextual controls.
      */
     function look() {
-        return telemetry.look(observe());
+        const scene = telemetry.look(observe());
+        const advice = movementAdvice();
+
+        if (advice) {
+            scene.movement = advice;
+        }
+
+        return scene;
     }
 
     /**
