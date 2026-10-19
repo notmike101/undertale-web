@@ -1,0 +1,85 @@
+name: Feature request
+description: Request new functionality or an improvement, with motivation and observable acceptance criteria.
+title: "[Feature]: "
+labels: ["enhancement"]
+type: Feature
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Complete every section; write "None" or "Not applicable" with a reason where needed.
+        Describe the behavior you want, not an implementation. Search existing issues first.
+        Do NOT propose code changes without explicit human authorization. Filing this request does not grant that authorization.
+        Do not attempt to include file attachments; provide the content directly or provide a reusable link to the file.
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Problem or motivation
+      description: Explain the unmet need or friction, why it matters, and any current workaround.
+      placeholder: |
+        Missing capability or friction:
+        Why it matters / what it would enable:
+        Current workaround, if any:
+    validations:
+      required: true
+
+  - type: textarea
+    id: desired-behavior
+    attributes:
+      label: Desired behavior and acceptance criteria
+      description: Describe the feature as observable behavior another person could verify, separate from how to build it. State what is explicitly out of scope.
+      placeholder: |
+        Proposed behavior:
+        Acceptance criteria (observable, verifiable):
+        Out of scope / explicitly not requested:
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-approach
+    attributes:
+      label: Proposed approach (optional detail, not a patch)
+      description: |
+        High-level ideas only if you have them; do not include patches, diffs, or implementation plans.
+        Write "Open to maintainers" if you have no preferred approach.
+      placeholder: |
+        High-level idea, or Open to maintainers:
+        Relevant areas of the project, if known:
+        Risks or complications you foresee:
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and prior art
+      description: Other solutions considered, similar features in other Undertale or community web projects, and related existing issues found when searching.
+      placeholder: |
+        Alternatives considered:
+        Prior art or related issues and pull requests:
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope-compatibility
+    attributes:
+      label: Scope and compatibility considerations
+      description: |
+        Note affected surfaces (gameplay, rendering, audio, saves, mods, browser or platform) and anything touching
+        proprietary Undertale assets or native saves. Keep proprietary material in ignored .private/; do not upload it here.
+      placeholder: |
+        Affected areas:
+        Save-data or compatibility impact:
+        Proprietary-asset or distribution concerns:
+        Platforms or browsers of interest:
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: authorization
+    attributes:
+      label: Human authorization requirement
+      options:
+        - label: "Do NOT propose code changes without explicit human authorization. This request authorizes investigation and reporting only; it does not authorize proposing or making code changes."
+          required: true
