@@ -431,4 +431,4 @@ document.addEventListener('visibilitychange', () => {
 canvas.addEventListener('pointerdown', () => {
     document.querySelector('#game-menu').open = false;
 });
-const agent = installAgent(state, canvas, persistSaves);
+const agent = installAgent(state, canvas, persistSaves, log);
