@@ -67,6 +67,7 @@ function controlState(snapshot, writers) {
     const chooser = find('obj_choicer');
     const essay = find('obj_essaystuff');
     const controller = find('obj_battlecontroller');
+    const world = find('obj_overworldcontroller');
     const intro = find('obj_intromenu');
     const title = find('obj_titleimage');
     const defeated = find('obj_heartdefeated');
@@ -148,7 +149,7 @@ function controlState(snapshot, writers) {
         context = 'battle-menu';
         details = { menu, selection: globals.bmenucoord?.[coordinate], rootActions: menu === 0 ? ['FIGHT', 'ACT', 'ITEM', 'MERCY'] : undefined };
         actions.push('Arrows select', 'Z or Enter confirms', 'X or Shift cancels a submenu');
-    } else if (globals.interact === 5) {
+    } else if (globals.interact === 5 || (world && main && (globals.menuno ?? -1) >= 0)) {
         context = 'overworld-menu';
         details = { menu: globals.menuno, selection: globals.menucoord?.[globals.menuno] };
         actions.push('Arrows select', 'Z or Enter confirms', 'X or Shift returns');
@@ -162,7 +163,7 @@ function controlState(snapshot, writers) {
         if (globals.typer !== 10) {
             actions.push('X or Shift can reveal remaining text when the current dialogue controller allows it');
         }
-    } else if (main?.selfVariables?.movement === 1 && globals.interact === 0) {
+    } else if (world && main?.selfVariables?.movement === 1 && (globals.interact ?? 0) === 0) {
         context = 'overworld';
         details = { x: main.x, y: main.y, ...select(main.selfVariables, ['facing', 'movement', 'uncan']) };
         actions.push('Arrows move');
@@ -171,7 +172,7 @@ function controlState(snapshot, writers) {
             actions.push('Z or Enter interacts with an adjacent target');
         }
 
-        if (globals.flag?.[17] === 0) {
+        if ((globals.flag?.[17] ?? 0) === 0) {
             actions.push('C or Control opens the menu');
         }
     }
@@ -312,6 +313,7 @@ export function createTelemetry() {
         const globals = sample.globalVariables ?? {};
         const instances = sample.instances ?? [];
         const writers = writerStates(instances);
+        const avatar = instances.find((instance) => instance.objectName?.toLowerCase() === 'obj_mainchara');
         const controls = controlState(sample, writers);
 
         return structuredClone({
@@ -325,7 +327,7 @@ export function createTelemetry() {
             running: sample.running,
             context: controls.context,
             controls,
-            player: select(globals, ['hp', 'maxhp', 'lv', 'gold', 'plot', 'inbattle']),
+            player: { ...select(globals, ['hp', 'maxhp', 'lv', 'gold', 'plot', 'inbattle']), ...(avatar ? select(avatar, ['x', 'y']) : {}) },
             battle: select(globals, ['turn', 'mnfight', 'myfight', 'mytarget', 'monster', 'monsterhp', 'monstermaxhp', 'idealborder']),
             dialogue: {
                 present: writers.length > 0,

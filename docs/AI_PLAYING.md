@@ -95,7 +95,7 @@ Normal controls: arrows move/select; Z or Enter confirms/interacts; X or Shift c
 | `paused` | Live runner pause flag, read from the same runner state as `status().paused`; the two views agree. The pause overlay on the canvas, paused input, and this field always describe the same pause state. |
 | `snapshotFrame`, `snapshotAgeFrames` | Check how old the sampled variables are relative to the presented frame. A state event may lag the newest rendered text by a few frames. |
 | `context`, `controls` | An inferred control mode, specific observed conditions, selection details, and available input hints. Bespoke scenes can behave differently; use screenshots when the inference is uncertain. |
-| `player`, `battle` | Selected player/battle variables such as HP, maximum HP, LV, plot, battle phase, and target health. Absent fields are not known values. |
+| `player`, `battle` | Selected player/battle variables such as HP, maximum HP, LV, plot, battle phase, and target health. `player.x`/`player.y` come from the `obj_mainchara` instance whenever it exists. Absent fields are not known values. |
 | `dialogue.present`, `dialogue.writerPresent` | Whether a recognized text-writer instance exists. This does not establish that every captured string is spoken dialogue. |
 | `dialogue.renderedTextPresent`, `dialogue.text`, `dialogue.lines` | Captured text draw commands, reconstructed into approximate reading order. These can contain menus, HUD labels, numbers, and speech. |
 | `dialogue.waitingForConfirm`, `dialogue.writers` | Writer progress and halt markers. A true waiting flag means a writer is at a confirmation boundary; check context and any choice before advancing. |

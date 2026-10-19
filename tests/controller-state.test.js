@@ -64,6 +64,22 @@ assert.equal(telemetry.look(sampled(8, {}, [writer, instance('obj_choicer', { my
 assert.equal(telemetry.look(sampled(9, {}, [writer, instance('obj_essaystuff', { keyboard_present: 1, cantype: 1 })])).context, 'text-entry');
 assert.equal(telemetry.look(sampled(10, {}, [instance('OBJ_WRITER', { halt: 2 })])).context, 'dialogue-wait');
 
+/*
+ Issue #6 live room_area1 shape: obj_mainchara.movement 1 plus obj_overworldcontroller,
+ while the `interact` and `flag` globals are never created; menu openness shows as `menuno` >= 0.
+*/
+const area1 = sampled(15, { menuno: -1 }, [instance('obj_mainchara', { movement: 1, uncan: 0 }), instance('obj_overworldcontroller', {})]);
+
+assert.equal(telemetry.look(area1).context, 'overworld');
+assert.ok(telemetry.look(area1).controls.actions.includes('Arrows move'));
+assert.ok(telemetry.look(area1).controls.actions.includes('C or Control opens the menu'));
+assert.equal(telemetry.look(area1).player.x, 32);
+assert.equal(telemetry.look(area1).player.y, 64);
+assert.equal(telemetry.look(sampled(16, { menuno: 0 }, [instance('obj_mainchara', { movement: 1 }), instance('obj_overworldcontroller', {})])).context, 'overworld-menu');
+assert.equal(telemetry.look(sampled(17, {}, [instance('obj_mainchara', { movement: 1 })])).context, 'unknown-or-cutscene');
+assert.equal(telemetry.look(sampled(18, { menuno: -1 }, [instance('obj_mainchara', { movement: 1 }), instance('obj_overworldcontroller', {}), instance('OBJ_WRITER', { halt: 2 })])).context, 'dialogue-wait');
+assert.equal(telemetry.look(sampled(19, { menuno: -1 }, [instance('obj_mainchara', { movement: 0 }), instance('obj_overworldcontroller', {})])).context, 'unknown-or-cutscene');
+
 const received = [];
 const unsubscribe = telemetry.subscribe((event) => received.push(event));
 
