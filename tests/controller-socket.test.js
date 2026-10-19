@@ -10,6 +10,7 @@ test('controller bridge replays events, correlates commands, and releases contro
     const actions = [];
     const replayCursors = [];
     const releases = [];
+    const logMessages = [];
     const history = [
         { sessionId: 'socket-check', seq: 1, type: 'state' },
         { sessionId: 'socket-check', seq: 2, type: 'dialogue' },
@@ -161,7 +162,7 @@ test('controller bridge replays events, correlates commands, and releases contro
             },
         };
 
-        stop = connectController(agent, telemetry);
+        stop = connectController(agent, telemetry, (message) => logMessages.push(message));
         await yieldTurn();
         connection.dispatchEvent(new MessageEvent('message', {
             data: JSON.stringify({ type: 'hello', sessionId: 'socket-check', latestSeq: 1 }),
@@ -193,6 +194,8 @@ test('controller bridge replays events, correlates commands, and releases contro
         await yieldTurn();
         assert.equal(connection.closedWith, 4_013);
         assert.deepEqual(releases, [{ pause: true }]);
+        assert.equal(logMessages.length, 1);
+        assert.match(logMessages[0], /bridge closed.*paused.*resume\(\)/u);
         assert.equal(status.textContent, 'Websocket controller: disconnected');
         stop();
         assert.equal(unsubscribed, true);

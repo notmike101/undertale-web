@@ -38,9 +38,10 @@ function showStatus(status) {
  *
  * @param {object} agent - Public agent actions and observations.
  * @param {object} telemetry - Sequenced event subscription and replay interface.
+ * @param {(message: string) => void} [log] - Page diagnostics log callback.
  * @returns {() => void} Stop reconnecting and close the bridge.
  */
-export function connectController(agent, telemetry) {
+export function connectController(agent, telemetry, log) {
     const methods = new Set(['look', 'observe', 'screenshot', 'save', 'act', 'type', 'pause', 'resume', 'keysDown', 'keysUp', 'releaseAll', 'controls', 'dialogueHistory', 'status']);
     let socket;
     let timer;
@@ -160,7 +161,9 @@ export function connectController(agent, telemetry) {
             connection.addEventListener('close', () => {
                 ready = false;
                 showStatus('disconnected');
-                Promise.resolve().then(() => agent.releaseAll({ pause: true })).catch(() => undefined);
+                Promise.resolve().then(() => agent.releaseAll({ pause: true })).then(() => {
+                    log?.('Websocket controller bridge closed; held inputs were released and the running game was paused. Call undertaleAgent.resume() to continue gameplay.');
+                }).catch(() => undefined);
                 reconnect();
             });
             connection.addEventListener('error', () => connection.close());
