@@ -1,5 +1,6 @@
 name: Issue report
 description: Report an issue with reproduction steps, local troubleshooting, and direct evidence.
+type: Bug
 body:
   - type: markdown
     attributes:
