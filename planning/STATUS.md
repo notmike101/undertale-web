@@ -35,7 +35,7 @@ Delivered a playable browser build and AI controller. The user explicitly stoppe
 
 ## Explicitly unverified / omitted
 
-- Full routes/endings, complete fidelity, named-game SAVE/Continue cycle and device/browser matrix.
+- Full routes/endings, complete fidelity and device/browser matrix. (The named-game SAVE -> close -> relaunch -> Continue cycle through the browser save layer was verified on 2026-10-19; see docs/PLAYABILITY.md.)
 - WebGPU backend: uses working WebGL2 backend to prioritize the actual game.
 - No public deployment or game-asset redistribution.
 - No broad test suite, per user instruction. Focused evidence is in `docs/PLAYABILITY.md`.
@@ -71,3 +71,4 @@ Delivered a playable browser build and AI controller. The user explicitly stoppe
 - Controller `save` still means "flush the active save". Management mutations acquire the same `navigator.locks` lease as launch, so running games serialize against management and other tabs.
 - `pagehide` now also flushes; exit, Restart and tab-hide keep awaited or started final flushes.
 - Live browser checks recorded in docs/PLAYABILITY.md. ESLint: zero warnings; controller node tests pass.
+- Verified end-to-end with an ordinary real run: named FRISKY on the letter grid, walked to the Ruins entrance SAVE point, game showed "File saved.", tab closed abruptly, and relaunching from that list entry offered CONTINUE which resumed at the save point.
