@@ -253,7 +253,11 @@ export function installAgent(state, canvas, persistSaves, log) {
         const pointer = state.runtime._agentSnapshot();
 
         if (!pointer) {
-            return { running: false, error: 'Runner is not ready.' };
+            /*
+               The runner exists but has no dumpable room; still report its live
+               pause flag so look() can never fall back to a stale frame's flag.
+             */
+            return { running: false, paused: livePaused(), error: 'Runner is not ready.' };
         }
 
         try {
